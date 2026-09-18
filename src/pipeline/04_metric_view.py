@@ -23,7 +23,6 @@ LANGUAGE YAML
 AS $$
 version: 0.1
 source: {catalog}.{gold}.customer_360
-comment: Governed Customer 360 KPIs for McDonald's PH loyalty program.
 dimensions:
   - name: Region
     expr: region
