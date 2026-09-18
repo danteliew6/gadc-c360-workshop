@@ -13,7 +13,17 @@ resources:
     mcdo_ph_c360:
       name: "mcdo-ph-c360"
       description: "McDonald's PH (GADC) — Customer Care & Loyalty Console (Customer 360) on Lakebase."
-      source_code_path: ../app
+
+      # GIT-BACKED deploy (this workspace requires it). The app source lives in
+      # the app/ subdirectory of the workshop repo, so source_code_path names
+      # that subpath within the cloned repo.
+      git_repository:
+        provider: gitHub
+        url: https://github.com/danteliew6/gadc-c360-workshop
+      git_source:
+        branch: main
+        # App source lives in the app/ subdirectory of the repo.
+        source_code_path: app
 
       # Start the app automatically on deploy.
       lifecycle:

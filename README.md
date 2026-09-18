@@ -77,9 +77,21 @@ databricks bundle deploy -t dev -p fevm-dante-classic-stable
 # 2. Run the whole pipeline end-to-end (setup → generate → Auto Loader → SDP → metrics)
 databricks bundle run mcdo_ph_c360_workshop -t dev -p fevm-dante-classic-stable
 
-# 3. Provision Lakebase serving tables + deploy the app (Module 4)
-bash scripts/provision_lakebase.sh
+# 3. Load the Lakebase serving tables the app reads (Module 4)
+/tmp/mcdo_venv/bin/python scripts/load_serving_lakebase.py   # reverse-ETL Gold -> Lakebase
+#   (managed synced tables — scripts/provision_lakebase.sh — are the preferred
+#    path but need CREATE CATALOG on the metastore; the reverse-ETL is the
+#    privilege-light equivalent used here.)
 ```
+
+## Live deployment (fevm-dante-classic-stable)
+
+| Asset | Link / id |
+|-------|-----------|
+| AI/BI dashboard | `dashboardsv3/01f1b337a37b1f7b9978024dbaee5432/published` |
+| Databricks App | https://mcdo-ph-c360-7474647641788932.aws.databricksapps.com |
+| SDP pipeline | `[dev] McDonald's PH — C360 SDP (Silver + Gold)` |
+| Lakebase project | `mcdo-ph-c360` (Autoscaling, PG 17) |
 
 Then open the **AI/BI dashboard** and the **Databricks App** from the workspace.
 Each `docs/0X-*.md` walks through the concepts and the code for that module.

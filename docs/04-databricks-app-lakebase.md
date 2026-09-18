@@ -36,9 +36,15 @@ transactional app that does per-customer lookups and writes on every click.
                                           app.notes           ┘
 ```
 
-- **`serving.*`** — Lakebase **synced tables** (SNAPSHOT mode) created by
-  `provision_lakebase.sh`. Read-only in Postgres; refreshed from Delta. The app
-  SP is granted `SELECT`.
+- **`serving.*`** — the Gold marts materialized into Lakebase for OLTP reads.
+  The **preferred** path is managed Lakebase **synced tables**
+  (`scripts/provision_lakebase.sh`, SNAPSHOT mode), but that registers the
+  Postgres DB as a UC catalog and needs `CREATE CATALOG` on the metastore. Where
+  that privilege isn't available (as in this FE workspace), use the
+  **reverse-ETL** equivalent `scripts/load_serving_lakebase.py`, which reads Gold
+  via a SQL warehouse and loads `serving.customer_360` / `serving.store_performance`
+  into Postgres, then grants the app SP `SELECT`. Either way the tables are
+  read-only to the app.
 - **`app.*`** — write-back tables **owned by the app's Service Principal**, created
   on first startup. The console inserts here.
 
