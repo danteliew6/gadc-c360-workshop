@@ -1,0 +1,27 @@
+# Databricks Apps manifest — McDonald's PH Customer 360 (React + AppKit).
+#
+# GIT-BACKED deploy: this workspace requires apps be backed by a Git repo, so the
+# Apps runtime clones the repo and runs the command below from its root. There is
+# no build-artifact upload, so the command is self-contained: install deps, build
+# the server + client, then start. (build:server / build:client are called
+# directly to skip dev-only pre-hooks that need network sync.)
+command:
+  - "sh"
+  - "-lc"
+  - "npm install --include=dev && npm run build:server && npm run build:client && npm run start"
+
+env:
+  # Autoscaling Lakebase endpoint the app mints/refreshes its own OAuth token for
+  # (server/lakebase.ts, via @databricks/lakebase). PGHOST/PGPORT/PGDATABASE/PGUSER
+  # are injected by the `postgres` app-resource binding; these have code defaults
+  # too, but are set here for clarity / local parity.
+  - name: LAKEBASE_ENDPOINT
+    value: "projects/mcdo-ph-c360/branches/production/endpoints/primary"
+  - name: PGHOST
+    value: "ep-divine-waterfall-d29cawrn.database.us-east-1.cloud.databricks.com"
+  - name: PGDATABASE
+    value: "databricks_postgres"
+  - name: LAKEBASE_SERVING_SCHEMA
+    value: "serving"
+  - name: LAKEBASE_APP_SCHEMA
+    value: "app"

@@ -1,0 +1,20 @@
+# Module 2 — Lakeflow Spark Declarative Pipeline (Silver + Gold).
+resources:
+  pipelines:
+    c360_pipeline:
+      name: "[${bundle.target}] McDonald's PH — C360 SDP (Silver + Gold)"
+      catalog: ${var.catalog}
+      schema: ${var.silver_schema} # default publish target for silver datasets
+      serverless: true
+      photon: true
+      development: true
+      continuous: false
+      configuration:
+        workshop.catalog: ${var.catalog}
+        workshop.bronze_schema: ${var.bronze_schema}
+        workshop.gold_schema: ${var.gold_schema}
+      libraries:
+        - file:
+            path: ../src/pipeline/02_silver_quality.py
+        - file:
+            path: ../src/pipeline/03_gold_customer360.py

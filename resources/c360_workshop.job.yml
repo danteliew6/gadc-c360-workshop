@@ -1,0 +1,65 @@
+# End-to-end orchestration: one job that runs the whole workshop.
+resources:
+  jobs:
+    mcdo_ph_c360_workshop:
+      name: "[${bundle.target}] McDonald's PH — C360 Workshop (end-to-end)"
+      tags:
+        workshop: gadc-c360
+        customer: mcdonalds-ph
+
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: bronze_schema
+          default: ${var.bronze_schema}
+        - name: gold_schema
+          default: ${var.gold_schema}
+        - name: landing_root
+          default: ${var.landing_root}
+
+      tasks:
+        - task_key: setup_uc
+          notebook_task:
+            notebook_path: ../src/setup/00_provision_uc.py
+            base_parameters:
+              catalog: "{{job.parameters.catalog}}"
+              bronze_schema: "{{job.parameters.bronze_schema}}"
+              silver_schema: ${var.silver_schema}
+              gold_schema: "{{job.parameters.gold_schema}}"
+              landing_root: "{{job.parameters.landing_root}}"
+
+        - task_key: generate_data
+          depends_on: [{ task_key: setup_uc }]
+          notebook_task:
+            notebook_path: ../src/data_generation/generate_and_land.py
+            base_parameters:
+              catalog: "{{job.parameters.catalog}}"
+              bronze_schema: "{{job.parameters.bronze_schema}}"
+              landing_root: "{{job.parameters.landing_root}}"
+              mode: full
+
+        - task_key: autoloader_bronze
+          depends_on: [{ task_key: generate_data }]
+          notebook_task:
+            notebook_path: ../src/pipeline/01_bronze_autoloader.py
+            base_parameters:
+              catalog: "{{job.parameters.catalog}}"
+              bronze_schema: "{{job.parameters.bronze_schema}}"
+
+        - task_key: sdp_silver_gold
+          depends_on: [{ task_key: autoloader_bronze }]
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.c360_pipeline.id}
+            full_refresh: false
+
+        - task_key: metric_view
+          depends_on: [{ task_key: sdp_silver_gold }]
+          notebook_task:
+            notebook_path: ../src/pipeline/04_metric_view.py
+            base_parameters:
+              catalog: "{{job.parameters.catalog}}"
+              gold_schema: "{{job.parameters.gold_schema}}"
+
+        # NOTE: Lakebase synced tables (Module 4 reads) are managed sync
+        # pipelines provisioned once via scripts/provision_lakebase.sh — they
+        # keep themselves up to date and are not part of this data job.

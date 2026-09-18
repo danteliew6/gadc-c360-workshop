@@ -1,0 +1,273 @@
+{
+  "datasets": [
+    {
+      "name": "ds_members",
+      "displayName": "Customer 360 (members)",
+      "queryLines": [
+        "SELECT customer_id, region, province, city, loyalty_tier, rfm_segment, churn_risk,\n",
+        "       preferred_channel, signup_channel, favorite_category, favorite_store,\n",
+        "       total_orders, total_spend, avg_order_value, clv_estimate, engagement_score,\n",
+        "       recency_days, tenure_days, rewards_redeemed, full_name, age\n",
+        "FROM dante_classic_stable_catalog.mcdo_ph_gold.customer_360"
+      ],
+      "columns": [
+        {"displayName": "Members", "description": "Distinct loyalty members", "expression": "COUNT(`customer_id`)"},
+        {"displayName": "Active Members", "description": "Members with >=1 completed order", "expression": "COUNT(CASE WHEN `total_orders` > 0 THEN `customer_id` END)"},
+        {"displayName": "Total Revenue", "description": "Lifetime net revenue", "expression": "SUM(`total_spend`)"},
+        {"displayName": "Total Orders", "description": "Lifetime orders", "expression": "SUM(`total_orders`)"},
+        {"displayName": "Avg Order Value", "description": "Revenue per order", "expression": "SUM(`total_spend`) / NULLIF(SUM(`total_orders`), 0)"},
+        {"displayName": "Repeat Rate", "description": "Share of active members with >1 order", "expression": "COUNT(CASE WHEN `total_orders` > 1 THEN `customer_id` END) * 1.0 / NULLIF(COUNT(CASE WHEN `total_orders` > 0 THEN `customer_id` END), 0)"},
+        {"displayName": "High Churn Members", "description": "Members flagged High churn risk", "expression": "COUNT(CASE WHEN `churn_risk` = 'High' THEN `customer_id` END)"},
+        {"displayName": "Est CLV", "description": "Sum of estimated customer lifetime value", "expression": "SUM(`clv_estimate`)"}
+      ]
+    },
+    {
+      "name": "ds_daily",
+      "displayName": "Daily sales",
+      "queryLines": [
+        "SELECT order_date, region, channel, orders, revenue, active_customers,\n",
+        "       avg_order_value, promo_discount\n",
+        "FROM dante_classic_stable_catalog.mcdo_ph_gold.daily_sales"
+      ]
+    },
+    {
+      "name": "ds_stores",
+      "displayName": "Store performance",
+      "queryLines": [
+        "SELECT store_id, store_name, region, province, city, store_format,\n",
+        "       latitude, longitude, orders, revenue, avg_order_value,\n",
+        "       unique_customers, drive_thru_share, revenue_per_customer\n",
+        "FROM dante_classic_stable_catalog.mcdo_ph_gold.store_performance"
+      ]
+    },
+    {
+      "name": "ds_category",
+      "displayName": "Category mix",
+      "queryLines": [
+        "SELECT region, category, is_localized, revenue, units, orders\n",
+        "FROM dante_classic_stable_catalog.mcdo_ph_gold.category_mix"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "overview",
+      "displayName": "Customer 360",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1",
+      "layout": [
+        {
+          "widget": {
+            "name": "hdr",
+            "multilineTextboxSpec": {
+              "lines": [
+                "# 🍟 McDonald's Philippines — Customer 360\n",
+                "**GADC loyalty analytics** · members, spend, retention and network performance. Synthetic demo data. KPIs and segments come from the governed Gold `customer_360` mart; use the **Filters** page to slice by region or tier."
+              ]
+            }
+          },
+          "position": {"x": 0, "y": 0, "width": 12, "height": 2}
+        },
+        {
+          "widget": {
+            "name": "kpi_active",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "measure(Active Members)", "expression": "MEASURE(`Active Members`)"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Active Members", "showTitle": true}, "encodings": {"value": {"fieldName": "measure(Active Members)", "displayName": "Active Members", "format": {"type": "number-plain", "decimalPlaces": {"type": "exact", "places": 0}}}}}
+          },
+          "position": {"x": 0, "y": 2, "width": 3, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "kpi_revenue",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "measure(Total Revenue)", "expression": "MEASURE(`Total Revenue`)"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Lifetime Revenue (₱)", "showTitle": true}, "encodings": {"value": {"fieldName": "measure(Total Revenue)", "displayName": "Revenue", "format": {"type": "number-currency", "currencyCode": "PHP", "decimalPlaces": {"type": "max", "places": 0}, "abbreviation": "compact"}}}}
+          },
+          "position": {"x": 3, "y": 2, "width": 3, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "kpi_aov",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "measure(Avg Order Value)", "expression": "MEASURE(`Avg Order Value`)"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Avg Order Value (₱)", "showTitle": true}, "encodings": {"value": {"fieldName": "measure(Avg Order Value)", "displayName": "AOV", "format": {"type": "number-currency", "currencyCode": "PHP", "decimalPlaces": {"type": "exact", "places": 2}}}}}
+          },
+          "position": {"x": 6, "y": 2, "width": 3, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "kpi_repeat",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "measure(Repeat Rate)", "expression": "MEASURE(`Repeat Rate`)"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Repeat Rate", "showTitle": true}, "encodings": {"value": {"fieldName": "measure(Repeat Rate)", "displayName": "Repeat Rate", "format": {"type": "number-percent", "decimalPlaces": {"type": "max", "places": 1}}}}}
+          },
+          "position": {"x": 9, "y": 2, "width": 3, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "revenue_trend",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_daily", "fields": [{"name": "daily(order_date)", "expression": "DATE_TRUNC(\"DAY\", `order_date`)"}, {"name": "sum(revenue)", "expression": "SUM(`revenue`)"}], "disaggregated": false}}],
+            "spec": {"version": 3, "widgetType": "line", "frame": {"title": "Daily net revenue (₱)", "showTitle": true}, "encodings": {"x": {"fieldName": "daily(order_date)", "scale": {"type": "temporal"}, "displayName": "Date"}, "y": {"fieldName": "sum(revenue)", "scale": {"type": "quantitative"}, "displayName": "Revenue"}}}
+          },
+          "position": {"x": 0, "y": 5, "width": 8, "height": 5}
+        },
+        {
+          "widget": {
+            "name": "tier_pie",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "measure(Members)", "expression": "MEASURE(`Members`)"}, {"name": "loyalty_tier", "expression": "`loyalty_tier`"}], "disaggregated": false}}],
+            "spec": {"version": 3, "widgetType": "pie", "frame": {"title": "Members by loyalty tier", "showTitle": true}, "encodings": {"angle": {"fieldName": "measure(Members)", "scale": {"type": "quantitative"}, "displayName": "Members"}, "color": {"fieldName": "loyalty_tier", "scale": {"type": "categorical"}, "displayName": "Tier"}, "label": {"show": true}}}
+          },
+          "position": {"x": 8, "y": 5, "width": 4, "height": 5}
+        },
+        {
+          "widget": {
+            "name": "rfm_bar",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "rfm_segment", "expression": "`rfm_segment`"}, {"name": "measure(Members)", "expression": "MEASURE(`Members`)"}], "disaggregated": false}}],
+            "spec": {"version": 3, "widgetType": "bar", "frame": {"title": "Members by RFM segment", "showTitle": true}, "encodings": {"x": {"fieldName": "rfm_segment", "scale": {"type": "categorical"}, "displayName": "Segment"}, "y": {"fieldName": "measure(Members)", "scale": {"type": "quantitative"}, "displayName": "Members"}}}
+          },
+          "position": {"x": 0, "y": 10, "width": 6, "height": 5}
+        },
+        {
+          "widget": {
+            "name": "churn_bar",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "churn_risk", "expression": "`churn_risk`"}, {"name": "measure(Members)", "expression": "MEASURE(`Members`)"}], "disaggregated": false}}],
+            "spec": {"version": 3, "widgetType": "bar", "frame": {"title": "Members by churn risk", "showTitle": true}, "encodings": {"x": {"fieldName": "churn_risk", "scale": {"type": "categorical"}, "displayName": "Churn risk"}, "y": {"fieldName": "measure(Members)", "scale": {"type": "quantitative"}, "displayName": "Members"}, "color": {"fieldName": "churn_risk", "scale": {"type": "categorical", "mappings": [{"value": "High", "color": "#DA291C"}, {"value": "Medium", "color": "#FFC72C"}, {"value": "Low", "color": "#3C7A3C"}, {"value": "N/A — Prospect", "color": "#B0B0B0"}]}}}}
+          },
+          "position": {"x": 6, "y": 10, "width": 6, "height": 5}
+        },
+        {
+          "widget": {
+            "name": "region_bar",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "region", "expression": "`region`"}, {"name": "measure(Total Revenue)", "expression": "MEASURE(`Total Revenue`)"}], "disaggregated": false}}],
+            "spec": {"version": 3, "widgetType": "bar", "frame": {"title": "Lifetime revenue by region (₱)", "showTitle": true}, "encodings": {"x": {"fieldName": "region", "scale": {"type": "categorical"}, "displayName": "Region"}, "y": {"fieldName": "measure(Total Revenue)", "scale": {"type": "quantitative"}, "displayName": "Revenue"}}}
+          },
+          "position": {"x": 0, "y": 15, "width": 6, "height": 5}
+        },
+        {
+          "widget": {
+            "name": "channel_pie",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_daily", "fields": [{"name": "sum(revenue)", "expression": "SUM(`revenue`)"}, {"name": "channel", "expression": "`channel`"}], "disaggregated": false}}],
+            "spec": {"version": 3, "widgetType": "pie", "frame": {"title": "Revenue by channel (₱)", "showTitle": true}, "encodings": {"angle": {"fieldName": "sum(revenue)", "scale": {"type": "quantitative"}, "displayName": "Revenue"}, "color": {"fieldName": "channel", "scale": {"type": "categorical"}, "displayName": "Channel"}, "label": {"show": true}}}
+          },
+          "position": {"x": 6, "y": 15, "width": 6, "height": 5}
+        },
+        {
+          "widget": {
+            "name": "top_members",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "full_name", "expression": "`full_name`"}, {"name": "region", "expression": "`region`"}, {"name": "loyalty_tier", "expression": "`loyalty_tier`"}, {"name": "rfm_segment", "expression": "`rfm_segment`"}, {"name": "total_orders", "expression": "`total_orders`"}, {"name": "total_spend", "expression": "`total_spend`"}, {"name": "clv_estimate", "expression": "`clv_estimate`"}, {"name": "churn_risk", "expression": "`churn_risk`"}], "disaggregated": true, "orders": [{"direction": "DESC", "expression": "`clv_estimate`"}]}}],
+            "spec": {"version": 2, "widgetType": "table", "frame": {"title": "Top members by estimated CLV", "showTitle": true}, "encodings": {"columns": [{"fieldName": "full_name", "displayName": "Member"}, {"fieldName": "region", "displayName": "Region"}, {"fieldName": "loyalty_tier", "displayName": "Tier"}, {"fieldName": "rfm_segment", "displayName": "Segment"}, {"fieldName": "total_orders", "displayName": "Orders"}, {"fieldName": "total_spend", "displayName": "Spend (₱)", "format": {"type": "number-currency", "currencyCode": "PHP", "decimalPlaces": {"type": "exact", "places": 0}}}, {"fieldName": "clv_estimate", "displayName": "Est CLV (₱)", "format": {"type": "number-currency", "currencyCode": "PHP", "decimalPlaces": {"type": "exact", "places": 0}}}, {"fieldName": "churn_risk", "displayName": "Churn"}]}}
+          },
+          "position": {"x": 0, "y": 20, "width": 12, "height": 6}
+        }
+      ]
+    },
+    {
+      "name": "stores",
+      "displayName": "Stores & Menu",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1",
+      "layout": [
+        {
+          "widget": {
+            "name": "hdr2",
+            "multilineTextboxSpec": {"lines": ["# 🏪 Network & Menu Performance\n", "Store-level revenue, drive-thru mix, and menu-category performance across the McDonald's PH network."]}
+          },
+          "position": {"x": 0, "y": 0, "width": 12, "height": 2}
+        },
+        {
+          "widget": {
+            "name": "kpi_stores",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_stores", "fields": [{"name": "count(store_id)", "expression": "COUNT(`store_id`)"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Stores", "showTitle": true}, "encodings": {"value": {"fieldName": "count(store_id)", "displayName": "Stores"}}}
+          },
+          "position": {"x": 0, "y": 2, "width": 4, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "kpi_netrev",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_stores", "fields": [{"name": "sum(revenue)", "expression": "SUM(`revenue`)"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Network Revenue (₱)", "showTitle": true}, "encodings": {"value": {"fieldName": "sum(revenue)", "displayName": "Revenue", "format": {"type": "number-currency", "currencyCode": "PHP", "decimalPlaces": {"type": "max", "places": 0}, "abbreviation": "compact"}}}}
+          },
+          "position": {"x": 4, "y": 2, "width": 4, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "kpi_dt",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_stores", "fields": [{"name": "avg(drive_thru_share)", "expression": "AVG(`drive_thru_share`)"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Avg Drive-Thru Share", "showTitle": true}, "encodings": {"value": {"fieldName": "avg(drive_thru_share)", "displayName": "Drive-Thru", "format": {"type": "number-percent", "decimalPlaces": {"type": "max", "places": 1}}}}}
+          },
+          "position": {"x": 8, "y": 2, "width": 4, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "store_map",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_stores", "fields": [{"name": "latitude", "expression": "`latitude`"}, {"name": "longitude", "expression": "`longitude`"}, {"name": "sum(revenue)", "expression": "SUM(`revenue`)"}, {"name": "sum(orders)", "expression": "SUM(`orders`)"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "symbol-map", "frame": {"title": "Stores by revenue", "showTitle": true}, "mark": {"opacity": 0.75}, "encodings": {"coordinates": {"latitude": {"fieldName": "latitude"}, "longitude": {"fieldName": "longitude"}}, "color": {"fieldName": "sum(revenue)", "scale": {"type": "quantitative", "colorRamp": {"mode": "custom-sequential", "colors": {"start": "#FFC72C", "end": "#DA291C"}}}}, "size": {"fieldName": "sum(orders)", "scale": {"type": "quantitative"}}}}
+          },
+          "position": {"x": 0, "y": 5, "width": 8, "height": 6}
+        },
+        {
+          "widget": {
+            "name": "cat_bar",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_category", "fields": [{"name": "category", "expression": "`category`"}, {"name": "sum(revenue)", "expression": "SUM(`revenue`)"}], "disaggregated": false, "orders": [{"direction": "DESC", "expression": "SUM(`revenue`)"}]}}],
+            "spec": {"version": 3, "widgetType": "bar", "frame": {"title": "Revenue by menu category (₱)", "showTitle": true}, "encodings": {"x": {"fieldName": "sum(revenue)", "scale": {"type": "quantitative"}, "displayName": "Revenue"}, "y": {"fieldName": "category", "scale": {"type": "categorical"}, "displayName": "Category"}}}
+          },
+          "position": {"x": 8, "y": 5, "width": 4, "height": 6}
+        },
+        {
+          "widget": {
+            "name": "store_table",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_stores", "fields": [{"name": "store_name", "expression": "`store_name`"}, {"name": "region", "expression": "`region`"}, {"name": "store_format", "expression": "`store_format`"}, {"name": "orders", "expression": "`orders`"}, {"name": "revenue", "expression": "`revenue`"}, {"name": "unique_customers", "expression": "`unique_customers`"}, {"name": "avg_order_value", "expression": "`avg_order_value`"}, {"name": "drive_thru_share", "expression": "`drive_thru_share`"}], "disaggregated": true, "orders": [{"direction": "DESC", "expression": "`revenue`"}]}}],
+            "spec": {"version": 2, "widgetType": "table", "frame": {"title": "Store performance", "showTitle": true}, "encodings": {"columns": [{"fieldName": "store_name", "displayName": "Store"}, {"fieldName": "region", "displayName": "Region"}, {"fieldName": "store_format", "displayName": "Format"}, {"fieldName": "orders", "displayName": "Orders"}, {"fieldName": "revenue", "displayName": "Revenue (₱)", "format": {"type": "number-currency", "currencyCode": "PHP", "decimalPlaces": {"type": "exact", "places": 0}}}, {"fieldName": "unique_customers", "displayName": "Customers"}, {"fieldName": "avg_order_value", "displayName": "AOV (₱)", "format": {"type": "number-currency", "currencyCode": "PHP", "decimalPlaces": {"type": "exact", "places": 0}}}, {"fieldName": "drive_thru_share", "displayName": "Drive-Thru %", "format": {"type": "number-percent", "decimalPlaces": {"type": "max", "places": 1}}}]}}
+          },
+          "position": {"x": 0, "y": 11, "width": 12, "height": 7}
+        }
+      ]
+    },
+    {
+      "name": "filters",
+      "displayName": "Filters",
+      "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
+      "layoutVersion": "GRID_V1",
+      "layout": [
+        {
+          "widget": {
+            "name": "f_region",
+            "queries": [
+              {"name": "qm", "query": {"datasetName": "ds_members", "fields": [{"name": "region", "expression": "`region`"}], "disaggregated": false}},
+              {"name": "qd", "query": {"datasetName": "ds_daily", "fields": [{"name": "region", "expression": "`region`"}], "disaggregated": false}},
+              {"name": "qs", "query": {"datasetName": "ds_stores", "fields": [{"name": "region", "expression": "`region`"}], "disaggregated": false}},
+              {"name": "qc", "query": {"datasetName": "ds_category", "fields": [{"name": "region", "expression": "`region`"}], "disaggregated": false}}
+            ],
+            "spec": {"version": 2, "widgetType": "filter-multi-select", "frame": {"title": "Region", "showTitle": true}, "encodings": {"fields": [{"fieldName": "region", "queryName": "qm", "displayName": "Region"}, {"fieldName": "region", "queryName": "qd"}, {"fieldName": "region", "queryName": "qs"}, {"fieldName": "region", "queryName": "qc"}]}}
+          },
+          "position": {"x": 0, "y": 0, "width": 4, "height": 2}
+        },
+        {
+          "widget": {
+            "name": "f_tier",
+            "queries": [{"name": "qt", "query": {"datasetName": "ds_members", "fields": [{"name": "loyalty_tier", "expression": "`loyalty_tier`"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "filter-multi-select", "frame": {"title": "Loyalty tier", "showTitle": true}, "encodings": {"fields": [{"fieldName": "loyalty_tier", "queryName": "qt", "displayName": "Tier"}]}}
+          },
+          "position": {"x": 4, "y": 0, "width": 4, "height": 2}
+        },
+        {
+          "widget": {
+            "name": "f_date",
+            "queries": [{"name": "qdate", "query": {"datasetName": "ds_daily", "fields": [{"name": "order_date", "expression": "`order_date`"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "filter-date-range-picker", "frame": {"title": "Order date", "showTitle": true}, "encodings": {"fields": [{"fieldName": "order_date", "queryName": "qdate"}]}}
+          },
+          "position": {"x": 8, "y": 0, "width": 4, "height": 2}
+        }
+      ]
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "canvasBackgroundColor": {"light": "#FBFAF7", "dark": "#1F272D"},
+      "widgetBackgroundColor": {"light": "#FFFFFF", "dark": "#11171C"},
+      "widgetBorderColor": {"light": "#FFFFFF", "dark": "#11171C"},
+      "fontColor": {"light": "#27251F", "dark": "#E8ECF0"},
+      "selectionColor": {"light": "#DA291C", "dark": "#FFC72C"},
+      "visualizationColors": ["#DA291C", "#FFC72C", "#C7511F", "#8A2A2A", "#3C7A3C", "#2F6E8F", "#6B4E8F"],
+      "widgetHeaderAlignment": "LEFT"
+    }
+  }
+}

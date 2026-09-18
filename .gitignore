@@ -1,0 +1,25 @@
+# Databricks
+.databricks/
+*.tfstate
+*.tfstate.backup
+.bundle/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Node / app
+node_modules/
+dist/
+client/dist/
+.env
+*.local
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.log

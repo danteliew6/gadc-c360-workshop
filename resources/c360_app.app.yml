@@ -1,0 +1,31 @@
+# Module 4 — Databricks App on Lakebase (React + AppKit).
+#
+# Customer Care & Loyalty Console (Customer 360) for McDonald's PH (GADC).
+# Fast reads over the `serving.*` synced tables + operational write-back into the
+# app-owned `app.*` tables. Bound to the Autoscaling Lakebase project via the
+# `postgres` app-resource key (NOT the legacy `database` key).
+#
+# NOTE: this workspace enforces git-backed app deploys. `source_code_path` points
+# the bundle at the app source (../app); the parent reconciles git-backing
+# (git_repository/git_source) at deploy time once the repo is on GitHub.
+resources:
+  apps:
+    mcdo_ph_c360:
+      name: "mcdo-ph-c360"
+      description: "McDonald's PH (GADC) — Customer Care & Loyalty Console (Customer 360) on Lakebase."
+      source_code_path: ../app
+
+      # Start the app automatically on deploy.
+      lifecycle:
+        started: true
+
+      # Autoscaling Lakebase binding. Injects PGHOST/PGPORT/PGDATABASE/PGUSER and
+      # grants the app SP CAN_CONNECT_AND_CREATE — which also lets it mint/refresh
+      # its own endpoint-scoped OAuth token at runtime (server/lakebase.ts via
+      # @databricks/lakebase).
+      resources:
+        - name: postgres
+          postgres:
+            branch: ${var.lakebase_branch}
+            database: ${var.lakebase_database}
+            permission: CAN_CONNECT_AND_CREATE

@@ -1,0 +1,55 @@
+@import "@databricks/appkit-ui/styles.css";
+
+/*
+ * McDonald's Philippines (GADC) — Customer 360 console (white-label demo).
+ * Light, professional theme: off-white ground, near-black text, McDonald's red
+ * as primary chrome and golden yellow as the accent. Mapped onto AppKit's
+ * design tokens so cards, tables, charts, and controls all theme from here.
+ */
+:root {
+  color-scheme: light;
+  --radius: 0.625rem;
+
+  --background: #faf8f5;
+  --foreground: #292929;
+  --card: #ffffff;
+  --card-foreground: #292929;
+  --popover: #ffffff;
+  --popover-foreground: #292929;
+
+  --primary: #da291c;
+  --primary-foreground: #ffffff;
+  --secondary: #fff4d6;
+  --secondary-foreground: #5a4300;
+  --muted: #f1ede7;
+  --muted-foreground: #6b7280;
+  --accent: #ffc72c;
+  --accent-foreground: #292929;
+
+  --destructive: #c62828;
+  --destructive-foreground: #ffffff;
+  --success: #1e8e3e;
+  --success-foreground: #ffffff;
+  --warning: #c77700;
+  --warning-foreground: #ffffff;
+
+  --border: #e6e0d8;
+  --input: #e6e0d8;
+  --ring: #da291c;
+
+  /* Chart palette: gold, red, blue, green, amber, grey. */
+  --chart-1: #ffc72c;
+  --chart-2: #da291c;
+  --chart-3: #1f6feb;
+  --chart-4: #1e8e3e;
+  --chart-5: #c77700;
+
+  --sidebar: #292929;
+  --sidebar-foreground: #f5f2ec;
+  --sidebar-primary: #ffc72c;
+  --sidebar-primary-foreground: #292929;
+  --sidebar-accent: #3a3a3a;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #3a3a3a;
+  --sidebar-ring: #ffc72c;
+}

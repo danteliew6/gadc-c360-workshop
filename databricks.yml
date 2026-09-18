@@ -1,0 +1,65 @@
+# ============================================================================
+# GADC Customer 360 Workshop — Databricks Asset Bundle (DAB)
+# ----------------------------------------------------------------------------
+# White-labeled for McDonald's Philippines (Golden Arches Development Corp).
+# A single bundle that provisions and orchestrates the full end-to-end demo:
+#   Module 1  Auto Loader ingestion from S3        -> mcdo_ph_bronze.*
+#   Module 2  Lakeflow SDP pipeline + expectations -> mcdo_ph_silver / gold
+#   Module 3  AI/BI (Lakeview) Customer 360 dashboard
+#   Module 4  Databricks App on Lakebase (fast reads/writes)
+#
+# Deploy:  databricks bundle deploy  -t dev -p fevm-dante-classic-stable
+# Run all: databricks bundle run     mcdo_ph_c360_workshop -t dev -p fevm-dante-classic-stable
+# ============================================================================
+bundle:
+  name: gadc-c360-workshop
+
+variables:
+  catalog:
+    description: Unity Catalog catalog that holds all workshop assets.
+    default: dante_classic_stable_catalog
+  bronze_schema:
+    description: Raw / ingested layer (Auto Loader landing zone tables).
+    default: mcdo_ph_bronze
+  silver_schema:
+    description: Cleaned & conformed layer (SDP + data-quality expectations).
+    default: mcdo_ph_silver
+  gold_schema:
+    description: Curated business layer (Customer 360, store & sales marts).
+    default: mcdo_ph_gold
+  landing_root:
+    description: S3-backed external location where raw source files land.
+    default: s3://dante-classic-stable-ext-s3-049629455384-g7v92y/mcdo_ph/landing
+  warehouse_id:
+    description: SQL warehouse used by the AI/BI dashboard.
+    default: 751d12396d67eb55
+  lakebase_project:
+    description: Lakebase Autoscaling project backing the Databricks App.
+    default: mcdo-ph-c360
+  lakebase_branch:
+    description: Lakebase branch resource path.
+    default: projects/mcdo-ph-c360/branches/production
+  lakebase_database:
+    description: Lakebase database resource path.
+    default: projects/mcdo-ph-c360/branches/production/databases/databricks-postgres
+
+include:
+  - resources/*.yml
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: https://fevm-dante-classic-stable.cloud.databricks.com
+    # In development mode DABs prefix resource names with [dev <user>] and
+    # pause schedules, so learners can safely deploy their own copy.
+
+  prod:
+    mode: production
+    workspace:
+      host: https://fevm-dante-classic-stable.cloud.databricks.com
+      root_path: /Workspace/Shared/gadc-c360-workshop/prod
+    permissions:
+      - level: CAN_MANAGE
+        user_name: dante.liew@databricks.com
