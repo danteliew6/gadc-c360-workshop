@@ -74,7 +74,7 @@ gadc-c360-workshop/
 ├── app/                               # Module 4 — React/AppKit + FastAPI app
 ├── scripts/provision_lakebase.sh      # one-time Lakebase synced tables + grants
 └── docs/                              # step-by-step module guides
-    ├── architecture.md
+    ├── 00-setup.md                    # deploy your own copy (customer setup)
     ├── 01-autoloader-from-s3.md
     ├── 02-sdp-pipeline-quality.md
     ├── 03-aibi-dashboard-c360.md
@@ -82,6 +82,11 @@ gadc-c360-workshop/
 ```
 
 ## Quickstart
+
+> **Deploying in your own workspace?** Follow **[docs/00-setup.md](docs/00-setup.md)** —
+> it lists the prerequisites and the values pinned to the demo environment you
+> need to change. The commands below are the **reference deployment** on the FE
+> demo workspace.
 
 ```bash
 # 0. Auth (Field Engineering workspace)
@@ -119,4 +124,5 @@ Each `docs/0X-*.md` walks through the concepts and the code for that module.
 - **SQL warehouse:** `dante-wh` · **Lakebase project:** `mcdo-ph-c360`
 
 All names are parameterized as DAB `variables` in `databricks.yml` — override per learner
-or per target to run isolated copies.
+or per target to run isolated copies. To stand this up in a **different workspace**
+(customer environment), see **[docs/00-setup.md](docs/00-setup.md)**.
