@@ -30,7 +30,8 @@ PG_USER = os.environ.get("PG_USER", "dante.liew@databricks.com")
 APP_SP = os.environ.get("APP_SP", "ed2a09a0-19f3-46db-a6c6-8ee30a0f2824")
 SERVING = "serving"
 
-TABLES = {"customer_360": "customer_id", "store_performance": "store_id"}
+TABLES = {"customer_360": "customer_id", "store_performance": "store_id",
+          "reward_performance": "reward_id"}
 
 # Spark/DBSQL type_code -> Postgres type
 PG_TYPE = {
@@ -86,6 +87,7 @@ def main():
                 pg.execute(f'CREATE INDEX IF NOT EXISTS ix_c360_region ON "{SERVING}"."{table}" (region)')
                 pg.execute(f'CREATE INDEX IF NOT EXISTS ix_c360_segment ON "{SERVING}"."{table}" (rfm_segment)')
                 pg.execute(f'CREATE INDEX IF NOT EXISTS ix_c360_name ON "{SERVING}"."{table}" (full_name)')
+                pg.execute(f'CREATE INDEX IF NOT EXISTS ix_c360_tier ON "{SERVING}"."{table}" (current_tier)')
             print(f"✓ {SERVING}.{table}: {len(rows)} rows, {len(cols)} cols")
 
     # Grant the app Service Principal read access to the serving schema.

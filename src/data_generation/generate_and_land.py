@@ -1,11 +1,21 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 01 · Generate & land synthetic source data (McDonald's PH)
+# MAGIC # 01 · Generate & land synthetic source data (McDonald's PH — MyMcDonald's Rewards)
 # MAGIC
-# MAGIC Produces a realistic **Customer 360** dataset for a QSR loyalty program and
-# MAGIC lands the *event/fact* feeds as JSON files on the **S3 landing volume** so
-# MAGIC that Auto Loader (Module 1) has real files to ingest. Reference dimensions
-# MAGIC (`dim_store`, `dim_product`) are written straight to Bronze as Delta.
+# MAGIC Produces a realistic **membership / loyalty** dataset for the *MyMcDonald's
+# MAGIC Rewards* program and lands the *event/fact* feeds as JSON files on the
+# MAGIC **S3 landing volume** so that Auto Loader (Module 1) has real files to
+# MAGIC ingest. Reference dimensions (`dim_store`, `dim_product`, `dim_reward`,
+# MAGIC `dim_tier`) are written straight to Bronze as Delta.
+# MAGIC
+# MAGIC ### Rewards model (synthetic, modeled on MyMcDonald's Rewards)
+# MAGIC * **Earn** 1 point per ₱1 net spend on app-linked orders, times a
+# MAGIC   **status-tier multiplier** (Member 1.0 · Silver 1.1 · Gold 1.25 · Platinum 1.5).
+# MAGIC * **Redeem** points against a rewards catalog priced in the four canonical
+# MAGIC   tiers **1500 / 3000 / 4500 / 6000** points.
+# MAGIC * Points **expire** after 12 months (drives *breakage*); occasional **bonus**
+# MAGIC   promos add points. The `points_ledger` feed is the single source of truth
+# MAGIC   for the points economy (earn / redeem / expire / bonus / adjust).
 # MAGIC
 # MAGIC Everything is generated **Spark-native** (no Faker / pip installs) so it runs
 # MAGIC on plain serverless. Runs in two modes:
@@ -56,6 +66,11 @@ else:
 spark.sql(f"USE CATALOG `{catalog}`")
 spark.sql(f"USE SCHEMA `{bronze}`")
 print(f"mode={mode} batch={batch_id} | customers={N_CUST} orders={N_ORDERS} events={N_EVENTS} days={DAYS}")
+
+# `full` overwrites its landing files so a backfill is idempotent (re-runnable
+# without accumulating stale rows); `incremental` appends a fresh batch to
+# demonstrate Auto Loader picking up only new files.
+land_mode = "overwrite" if mode == "full" else "append"
 
 # COMMAND ----------
 
@@ -132,6 +147,39 @@ PRODUCTS = [
     ("6pc Chicken McNuggets", "Chicken", 130.0, False),
 ]
 
+# --- MyMcDonald's Rewards program config -----------------------------------
+# Status tier -> (tier_rank, min rolling-12mo points to qualify, earn multiplier)
+TIER_DEF = {
+    "Member":   (1, 0,     1.00),
+    "Silver":   (2, 5000,  1.10),
+    "Gold":     (3, 15000, 1.25),
+    "Platinum": (4, 40000, 1.50),
+}
+# Blended peso value of one point (used for the points-liability estimate in Gold).
+POINT_VALUE_PHP = 0.04
+
+# reward_name, category, point_cost, est_value_php  (grouped by the 4 canonical tiers)
+REWARDS_CATALOG = [
+    # 1500-point tier — snacks / sides / desserts
+    ("Free World Famous Fries (Med)", "Sides",     1500, 75.0),
+    ("Free Hashbrown",                "Sides",     1500, 45.0),
+    ("Free Coke Float",               "Beverages", 1500, 55.0),
+    ("Free Hot Fudge Sundae",         "Desserts",  1500, 40.0),
+    # 3000-point tier — singles / McCafé
+    ("Free McChicken",                "Burgers",   3000, 95.0),
+    ("Free McSpaghetti",              "Pasta",     3000, 65.0),
+    ("Free Premium Roast Coffee",     "McCafé",    3000, 65.0),
+    ("Free 6pc Chicken McNuggets",    "Chicken",   3000, 130.0),
+    # 4500-point tier — premium sandwiches
+    ("Free Big Mac",                  "Burgers",   4500, 160.0),
+    ("Free Quarter Pounder w/ Cheese","Burgers",   4500, 175.0),
+    ("Free Chicken McDo (1pc) w/ Rice","Chicken",  4500, 99.0),
+    # 6000-point tier — value meals / premium McCafé
+    ("Free Chicken McDo (2pc) w/ Rice","Chicken",  6000, 175.0),
+    ("Free McSpaghetti w/ Chicken McDo","Value Meals", 6000, 165.0),
+    ("Free Caramel Frappé",           "McCafé",    6000, 135.0),
+]
+
 # COMMAND ----------
 
 # MAGIC %md ### Dimensions (written to Bronze as Delta — reference data)
@@ -166,6 +214,26 @@ if mode == "full":
     )
     products.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable("dim_product")
     print(f"✓ dim_product ({products.count()} rows)")
+
+    tier_rows = [(name, r[0], r[1], r[2]) for name, r in TIER_DEF.items()]
+    tiers = spark.createDataFrame(
+        tier_rows, "tier_name string, tier_rank int, min_points_12mo int, earn_multiplier double"
+    )
+    tiers.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable("dim_tier")
+    print(f"✓ dim_tier ({tiers.count()} rows)")
+
+    reward_rows = [
+        (f"RWD-{i:03d}", r[0], r[1], int(r[2]), float(r[3]),
+         f"{r[2]} pts", float(r[3]) / r[2])  # value per point (redeemed)
+        for i, r in enumerate(REWARDS_CATALOG)
+    ]
+    rewards = spark.createDataFrame(
+        reward_rows,
+        "reward_id string, reward_name string, category string, point_cost int, "
+        "est_value_php double, reward_tier string, value_per_point double",
+    ).withColumn("is_active", F.lit(True))
+    rewards.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable("dim_reward")
+    print(f"✓ dim_reward ({rewards.count()} rows)")
 
 products = spark.table("dim_product")
 N_PROD = products.count()
@@ -277,8 +345,8 @@ orders = (
     .withColumn("_source_system", F.lit("pos"))
 )
 
-(orders.repartition(12).write.mode("append").json(f"{landing}/orders/batch={batch_id}"))
-(items.repartition(12).write.mode("append").json(f"{landing}/order_items/batch={batch_id}"))
+(orders.repartition(12).write.mode(land_mode).json(f"{landing}/orders/batch={batch_id}"))
+(items.repartition(12).write.mode(land_mode).json(f"{landing}/order_items/batch={batch_id}"))
 print(f"✓ landed orders + order_items (batch={batch_id})")
 
 # COMMAND ----------
@@ -302,12 +370,138 @@ events = (
                 F.format_string("STR-%04d", (F.rand(79) * N_STORE).cast("int"))))
     .select("event_id", "customer_id", "event_ts", "event_type", "platform", "session_id", "store_id")
 )
-(events.repartition(10).write.mode("append").json(f"{landing}/app_events/batch={batch_id}"))
+(events.repartition(10).write.mode(land_mode).json(f"{landing}/app_events/batch={batch_id}"))
 print(f"✓ landed app_events (batch={batch_id})")
+
+# COMMAND ----------
+
+# MAGIC %md ### Points ledger  → land JSON to `landing/points_ledger/`
+# MAGIC The MyMcDonald's Rewards points economy: **EARN** rows are derived from
+# MAGIC completed orders (1 pt/₱1 × the member's status-tier multiplier); **REDEEM**
+# MAGIC rows consume a reward's `point_cost`; **BONUS** promos add points; and (full
+# MAGIC backfill only) **EXPIRE** rows age out old points to create *breakage*.
+# MAGIC A few rows are deliberately dirty (null member, unknown txn type) for the
+# MAGIC Module 2 data-quality story.
+
+# COMMAND ----------
+
+REWARD_IDS = [f"RWD-{i:03d}" for i in range(len(REWARDS_CATALOG))]
+REWARD_COSTS = [r[2] for r in REWARDS_CATALOG]
+# Tuned so redemptions consume ~20-25% of earned points and expiry (breakage)
+# ~8-10% — a realistic, healthy loyalty economy rather than a points deficit.
+N_REDEEM = max(1, int(N_ORDERS * 0.04))
+N_BONUS = max(1, int(N_ORDERS * 0.03))
+N_EXPIRE = max(1, int(N_CUST * 0.35))
+LEDGER_COLS = ["ledger_id", "customer_id", "txn_ts", "txn_type", "points",
+               "order_id", "reward_id", "source_channel"]
+
+# Per-customer status tier, reproduced deterministically from the SAME seeded
+# expression used when generating customers, so EARN multipliers line up with
+# each member's tier without needing to re-read the landed customers feed.
+tier_mult = (F.when(F.col("loyalty_tier") == "Platinum", F.lit(1.50))
+             .when(F.col("loyalty_tier") == "Gold", F.lit(1.25))
+             .when(F.col("loyalty_tier") == "Silver", F.lit(1.10))
+             .otherwise(F.lit(1.00)))
+cust_tier = (
+    spark.range(N_CUST)
+    .withColumn("customer_id", F.format_string("CUST-%07d", F.col("id").cast("int")))
+    .withColumn("loyalty_tier", F.element_at(F.expr(sql_arr(TIERS)),
+                F.when(F.rand(19) > 0.85, 4).when(F.rand(19) > 0.65, 3)
+                 .when(F.rand(19) > 0.35, 2).otherwise(1)))
+    .withColumn("earn_multiplier", tier_mult)
+    .select("customer_id", "earn_multiplier")
+)
+
+# EARN — one ledger row per completed order.
+earn = (
+    orders.filter(F.col("order_status") == "COMPLETED")
+    .join(cust_tier, "customer_id", "left")
+    .withColumn("earn_multiplier", F.coalesce(F.col("earn_multiplier"), F.lit(1.0)))
+    .withColumn("points", F.floor(F.col("net_amount") * F.col("earn_multiplier")).cast("int"))
+    .filter(F.col("points") > 0)
+    .withColumn("ledger_id", F.concat(F.lit(f"PL-E-B{batch_id}-"), F.col("order_id")))
+    .withColumn("txn_type", F.lit("EARN"))
+    .withColumn("txn_ts", F.col("order_ts"))
+    .withColumn("reward_id", F.lit(None).cast("string"))
+    .withColumn("source_channel", F.col("channel"))
+    .select(*LEDGER_COLS)
+)
+
+# REDEEM — members spend points on catalog rewards (skewed toward cheaper tiers).
+cost_arr = "array(" + ",".join(str(c) for c in REWARD_COSTS) + ")"
+redeem = (
+    spark.range(N_REDEEM)
+    .withColumn("cust_idx", (F.pow(F.rand(81), F.lit(1.7)) * N_CUST).cast("int"))
+    .withColumn("customer_id", F.format_string("CUST-%07d", F.col("cust_idx")))
+    .withColumn("ridx", (F.pow(F.rand(82), F.lit(2.4)) * len(REWARDS_CATALOG)).cast("int"))
+    .withColumn("reward_id", F.element_at(F.expr(sql_arr(REWARD_IDS)), F.col("ridx") + 1))
+    .withColumn("points", -F.element_at(F.expr(cost_arr), F.col("ridx") + 1).cast("int"))
+    .withColumn("txn_ts", F.expr(
+        f"current_timestamp() - make_dt_interval(cast(pow(rand(83),1.3)*{max(1, DAYS - 2)} as int), "
+        f"cast(rand(84)*24 as int), cast(rand(85)*60 as int), 0)"))
+    .withColumn("ledger_id", F.format_string(f"PL-R-B{batch_id}-%09d", F.col("id").cast("int")))
+    .withColumn("txn_type", F.lit("REDEEM"))
+    .withColumn("order_id", F.lit(None).cast("string"))
+    .withColumn("source_channel", F.lit("app"))
+    .select(*LEDGER_COLS)
+)
+
+# BONUS — promo point boosts (e.g. app-birthday, double-points weekends).
+bonus = (
+    spark.range(N_BONUS)
+    .withColumn("cust_idx", (F.pow(F.rand(86), F.lit(1.4)) * N_CUST).cast("int"))
+    .withColumn("customer_id", F.format_string("CUST-%07d", F.col("cust_idx")))
+    .withColumn("points", (F.rand(87) * 400 + 100).cast("int"))
+    .withColumn("txn_ts", F.expr(
+        f"current_timestamp() - make_dt_interval(cast(rand(88)*{max(1, DAYS)} as int), "
+        f"cast(rand(89)*24 as int), 0, 0)"))
+    .withColumn("ledger_id", F.format_string(f"PL-B-B{batch_id}-%09d", F.col("id").cast("int")))
+    .withColumn("txn_type", F.lit("BONUS"))
+    .withColumn("order_id", F.lit(None).cast("string"))
+    .withColumn("reward_id", F.lit(None).cast("string"))
+    .withColumn("source_channel", F.lit("promo"))
+    .select(*LEDGER_COLS)
+)
+
+ledger = earn.unionByName(redeem).unionByName(bonus)
+
+if mode == "full":
+    # EXPIRE — points aging out after 12 months, dated in the older half of the
+    # window so they sit behind recent activity (this is program breakage).
+    expire = (
+        spark.range(N_EXPIRE)
+        .withColumn("cust_idx", (F.rand(90) * N_CUST).cast("int"))
+        .withColumn("customer_id", F.format_string("CUST-%07d", F.col("cust_idx")))
+        .withColumn("points", -(F.rand(91) * 3000 + 500).cast("int"))
+        .withColumn("txn_ts", F.expr(
+            f"current_timestamp() - make_dt_interval(cast(rand(92)*{max(1, DAYS // 2)} + {DAYS // 2} as int), "
+            f"0, 0, 0)"))
+        .withColumn("ledger_id", F.format_string("PL-X-%09d", F.col("id").cast("int")))
+        .withColumn("txn_type", F.lit("EXPIRE"))
+        .withColumn("order_id", F.lit(None).cast("string"))
+        .withColumn("reward_id", F.lit(None).cast("string"))
+        .withColumn("source_channel", F.lit("system"))
+        .select(*LEDGER_COLS)
+    )
+    ledger = ledger.unionByName(expire)
+
+# Inject ~0.3% dirty rows for the DQ expectations in Module 2.
+ledger = (
+    ledger
+    .withColumn("customer_id", F.when(F.rand(93) < 0.002, F.lit(None)).otherwise(F.col("customer_id")))
+    .withColumn("txn_type", F.when(F.rand(94) < 0.001, F.lit("UNKNOWN")).otherwise(F.col("txn_type")))
+    .withColumn("_source_system", F.lit("loyalty-rewards"))
+)
+(ledger.repartition(12).write.mode(land_mode).json(f"{landing}/points_ledger/batch={batch_id}"))
+print(f"✓ landed points_ledger (batch={batch_id})")
+
+# COMMAND ----------
 
 spark.sql("DROP TABLE IF EXISTS _stage_orders")
 spark.sql("DROP TABLE IF EXISTS _stage_order_items")
 
 # COMMAND ----------
 
-dbutils.notebook.exit(f"Landed {mode} batch={batch_id}: {N_ORDERS} orders, {N_EVENTS} events at {landing}")
+dbutils.notebook.exit(
+    f"Landed {mode} batch={batch_id}: {N_ORDERS} orders, {N_EVENTS} events, "
+    f"points_ledger (earn+{N_REDEEM} redeem+{N_BONUS} bonus) at {landing}")

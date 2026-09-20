@@ -14,7 +14,7 @@ import { StateBlock } from '../components/StateBlock';
 import { DataGrid, type Column } from '../components/DataGrid';
 import { Chip } from '../components/Chip';
 import { useApi } from '../lib/api';
-import { CHURN_TONE } from '../lib/colors';
+import { CHURN_TONE, TIER_TONE } from '../lib/colors';
 import { php, int, ymd } from '../lib/format';
 import type { Facets, MemberSearchRow } from '../lib/types';
 
@@ -26,6 +26,7 @@ export function MemberSearch() {
   const [dq, setDq] = useState('');
   const [region, setRegion] = useState(ALL);
   const [segment, setSegment] = useState(ALL);
+  const [tier, setTier] = useState(ALL);
 
   // Debounce the free-text query so we don't refetch on every keystroke.
   useEffect(() => {
@@ -39,8 +40,9 @@ export function MemberSearch() {
     if (dq) params.set('q', dq);
     if (region !== ALL) params.set('region', region);
     if (segment !== ALL) params.set('segment', segment);
+    if (tier !== ALL) params.set('tier', tier);
     return `/api/members?${params.toString()}`;
-  }, [dq, region, segment]);
+  }, [dq, region, segment, tier]);
   const members = useApi<MemberSearchRow[]>(url);
 
   const columns: Column<MemberSearchRow>[] = [
@@ -48,10 +50,11 @@ export function MemberSearch() {
     { key: 'full_name', label: 'Name' },
     { key: 'region', label: 'Region' },
     {
-      key: 'loyalty_tier',
+      key: 'current_tier',
       label: 'Tier',
-      render: (v) => (v ? <Chip label={v as string} tone="gold" /> : '—'),
+      render: (v) => (v ? <Chip label={v as string} tone={TIER_TONE[v as string] ?? 'gold'} /> : '—'),
     },
+    { key: 'points_balance', label: 'Points', align: 'right', render: (v) => int(v) },
     {
       key: 'rfm_segment',
       label: 'Segment',
@@ -74,7 +77,7 @@ export function MemberSearch() {
     <div className="space-y-4">
       <Panel
         title="Find a member"
-        subtitle="Search by name, customer ID, or email · filter by region and RFM segment"
+        subtitle="Search by name, customer ID, or email · filter by region, tier, and RFM segment"
       >
         <div className="flex flex-col gap-3 md:flex-row md:items-center">
           <div className="relative flex-1 min-w-[220px]">
@@ -96,6 +99,19 @@ export function MemberSearch() {
               {(facets.data?.regions ?? []).map((r) => (
                 <SelectItem key={r} value={r}>
                   {r}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={tier} onValueChange={setTier}>
+            <SelectTrigger className="md:w-44" aria-label="Filter by tier">
+              <SelectValue placeholder="Tier" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>All tiers</SelectItem>
+              {(facets.data?.tiers ?? []).map((t) => (
+                <SelectItem key={t} value={t}>
+                  {t}
                 </SelectItem>
               ))}
             </SelectContent>

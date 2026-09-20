@@ -1,8 +1,8 @@
-# Module 3 — AI/BI (Lakeview) Customer 360 dashboard.
+# Module 3 — AI/BI (Lakeview) MyMcDonald's Rewards membership dashboard.
 resources:
   dashboards:
     c360_dashboard:
-      display_name: "[${bundle.target}] McDonald's PH — Customer 360"
+      display_name: "[${bundle.target}] McDonald's PH — MyMcDonald's Rewards"
       file_path: ../src/dashboards/mcdo_ph_c360.lvdash.json
       warehouse_id: ${var.warehouse_id}
       embed_credentials: true

@@ -1,21 +1,35 @@
-# McDonald's PH — Customer 360 Lakehouse Workshop
+# McDonald's PH — MyMcDonald's Rewards Membership Analytics Workshop
 
 A hands-on, end-to-end **Databricks Data Intelligence Platform** workshop built for
 **GADC (Golden Arches Development Corporation)** — the McDonald's franchise operator
-in the Philippines. It takes raw loyalty-app and point-of-sale data all the way to a
-live, operational **Customer 360** experience, using the modern Databricks stack.
+in the Philippines. It takes raw **MyMcDonald's Rewards** loyalty-app and point-of-sale
+data all the way to a live, operational **membership analytics** experience — the
+**points economy**, status tiers, and rewards catalog — on the modern Databricks stack.
 
 > The dataset is **synthetic** and Philippines-localized (NCR/regional stores,
-> GCash/Maya payments, McDelivery, localized menu). No real customer data is used.
+> GCash/Maya payments, McDelivery, localized menu). The loyalty mechanics are modeled
+> on **MyMcDonald's Rewards** (earn 1 pt/₱1 × status-tier multiplier; redeem across the
+> 1500/3000/4500/6000-point reward tiers). **No real customer data is used.**
 
 ## What you build
 
 | # | Module | Product | Outcome |
 |---|--------|---------|---------|
-| 1 | **Ingest** | Auto Loader (Structured Streaming) from **S3** | Incremental, schema-evolving ingestion of 4 raw feeds into Bronze |
-| 2 | **Transform + govern** | **Lakeflow SDP** pipeline w/ **data-quality expectations** + SCD2 | Cleaned Silver + curated **Customer 360** Gold marts |
-| 3 | **Analyze** | **AI/BI (Lakeview)** dashboard + governed **metric view** | Executive Customer 360 analytics + Genie-ready KPIs |
-| 4 | **Activate** | **Databricks App** on **Lakebase** (Postgres) | Customer-care console: millisecond reads + operational write-back |
+| 1 | **Ingest** | Auto Loader (Structured Streaming) from **S3** | Incremental, schema-evolving ingestion of 5 raw feeds (incl. the **points ledger**) into Bronze |
+| 2 | **Transform + govern** | **Lakeflow SDP** pipeline w/ **data-quality expectations** + SCD2 | Cleaned Silver + curated **Member 360** + points-economy Gold marts |
+| 3 | **Analyze** | **AI/BI (Lakeview)** dashboard + governed **metric view** | Membership & rewards analytics (points earned/redeemed, liability, tier health) + Genie-ready KPIs |
+| 4 | **Activate** | **Databricks App** on **Lakebase** (Postgres) | Membership-care console: millisecond reads + points/reward write-back |
+
+### MyMcDonald's Rewards model (synthetic)
+
+- **Earn** 1 point per ₱1 net spend on app-linked orders, times a **status-tier
+  multiplier** — Member ×1.0 · Silver ×1.1 · Gold ×1.25 · Platinum ×1.5.
+- **Redeem** points against a rewards catalog priced in the four canonical tiers
+  **1500 / 3000 / 4500 / 6000** points.
+- Points **expire** after 12 months (program *breakage*); **bonus** promos add points.
+  The `points_ledger` feed is the single source of truth for the points economy.
+- **Status tier** is qualified on rolling-12-month earned points; the gap between the
+  tier a member *holds* and the tier they *qualify* for drives up/downgrade actions.
 
 ## Architecture
 
@@ -24,17 +38,19 @@ live, operational **Customer 360** experience, using the modern Databricks stack
    ─────────────────      ┌───────────────────────────────────────────────────────┐
    customers.json  ──┐    │  BRONZE (mcdo_ph_bronze)   SILVER (mcdo_ph_silver)      │
    orders.json     ──┤    │  customers_raw       ┌──►  orders_clean  (expectations) │
-   order_items.json──┼─►  │  orders_raw          │     order_items_clean            │
-   app_events.json ──┘    │  app_events_raw ─────┘     app_events_clean             │
+   order_items.json──┤    │  orders_raw          │     order_items_clean            │
+   app_events.json ──┤►   │  app_events_raw      │     app_events_clean             │
+   points_ledger.json─┘   │  points_ledger_raw ──┘     points_ledger_clean (+quar.) │
         │                 │  dim_store / dim_product   dim_customer (SCD2, Auto CDC)│
-        ▼ (land files)    │        ▲                            │                   │
-   S3 external volume     │        │ Auto Loader                ▼                   │
+        ▼ (land files)    │  dim_reward / dim_tier              │                   │
+   S3 external volume     │        ▲ Auto Loader                ▼                   │
    s3://…/mcdo_ph/landing │  [Module 1] cloudFiles     GOLD (mcdo_ph_gold)          │
-                          │                            customer_360 · store_perf ·  │
-                          │  [Module 2] SDP + DQ ─────► daily_sales · category_mix   │
+                          │                            customer_360 (Member 360) ·  │
+                          │  [Module 2] SDP + DQ ─────► points_economy · reward_perf │
+                          │                            · tier_migration · store_perf │
                           └────────────┬─────────────────────────┬──────────────────┘
                                        │                          │
-                        [Module 3] AI/BI dashboard   [Module 4] Lakebase synced tables
+                        [Module 3] AI/BI dashboard   [Module 4] Lakebase serving tables
                         + c360_metrics metric view   → Databricks App (reads + write-back)
 ```
 
@@ -50,11 +66,11 @@ gadc-c360-workshop/
 │   └── c360_app.app.yml               #   Module 4 — Databricks App
 ├── src/
 │   ├── setup/00_provision_uc.py       # schemas + S3 landing volume
-│   ├── data_generation/generate_and_land.py   # synthetic data → S3
-│   ├── pipeline/01_bronze_autoloader.py        # Module 1 — Auto Loader
-│   ├── pipeline/02_silver_quality.py           # Module 2 — Silver + expectations
-│   ├── pipeline/03_gold_customer360.py         # Module 2 — Gold marts
-│   └── pipeline/04_metric_view.py              # Module 2 — metric view
+│   ├── data_generation/generate_and_land.py   # synthetic data (+ points ledger) → S3
+│   ├── pipeline/01_bronze_autoloader.py        # Module 1 — Auto Loader (5 feeds)
+│   ├── pipeline/02_silver_quality.py           # Module 2 — Silver + expectations (incl. points ledger)
+│   ├── pipeline/03_gold_customer360.py         # Module 2 — Member 360 + points-economy marts
+│   └── pipeline/04_metric_view.py              # Module 2 — rewards metric view
 ├── app/                               # Module 4 — React/AppKit + FastAPI app
 ├── scripts/provision_lakebase.sh      # one-time Lakebase synced tables + grants
 └── docs/                              # step-by-step module guides

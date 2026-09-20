@@ -96,6 +96,7 @@ ingest("customers", "customers_raw", cluster_by="region")
 ingest("orders", "orders_raw", cluster_by="order_ts")
 ingest("order_items", "order_items_raw")
 ingest("app_events", "app_events_raw", cluster_by="event_ts")
+ingest("points_ledger", "points_ledger_raw", cluster_by="txn_ts")
 
 # COMMAND ----------
 
@@ -115,6 +116,7 @@ display(
         UNION ALL SELECT 'orders_raw', count(*), count(_rescued_data), max(_ingest_ts) FROM orders_raw
         UNION ALL SELECT 'order_items_raw', count(*), count(_rescued_data), max(_ingest_ts) FROM order_items_raw
         UNION ALL SELECT 'app_events_raw', count(*), count(_rescued_data), max(_ingest_ts) FROM app_events_raw
+        UNION ALL SELECT 'points_ledger_raw', count(*), count(_rescued_data), max(_ingest_ts) FROM points_ledger_raw
         """
     )
 )

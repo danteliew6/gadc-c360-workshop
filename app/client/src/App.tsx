@@ -1,10 +1,11 @@
 import { createBrowserRouter, RouterProvider, NavLink, Outlet, useLocation } from 'react-router';
 import { useEffect, useState } from 'react';
 import { Badge, Button, Sheet, SheetContent, SheetHeader, SheetTitle, useIsMobile } from '@databricks/appkit-ui/react';
-import { Menu, Users, Store } from 'lucide-react';
+import { Menu, Users, Store, Gift } from 'lucide-react';
 import { MemberSearch } from './pages/MemberSearch';
 import { Member360 } from './pages/Member360';
 import { Stores } from './pages/Stores';
+import { Rewards } from './pages/Rewards';
 import { useApi } from './lib/api';
 import { ymd, int } from './lib/format';
 import type { Meta } from './lib/types';
@@ -17,8 +18,12 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { to: '/', label: 'Member Search', icon: Users },
+  { to: '/rewards', label: 'Rewards Catalog', icon: Gift },
   { to: '/stores', label: 'Store Overview', icon: Store },
 ];
+
+const BRAND_NAME = "MyMcDonald's Rewards";
+const BRAND_SUB = 'Membership 360';
 
 function navLinkClass({ isActive }: { isActive: boolean }) {
   return `flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -28,16 +33,14 @@ function navLinkClass({ isActive }: { isActive: boolean }) {
   }`;
 }
 
-/** Simple arches-style wordmark (no real McDonald's assets). */
+/** McDonald's golden-arches logo mark. */
 function ArchesMark() {
   return (
-    <span
-      aria-hidden
-      className="inline-flex h-7 w-8 items-center justify-center rounded-md font-black text-lg leading-none"
-      style={{ color: '#292929', background: 'var(--sidebar-primary)' }}
-    >
-      M
-    </span>
+    <img
+      src="/brand/mcdo-logo.png"
+      alt="McDonald's"
+      className="h-8 w-8 rounded-md shrink-0"
+    />
   );
 }
 
@@ -60,8 +63,10 @@ function Brand() {
       <div className="flex items-center gap-2.5 text-sidebar-foreground font-semibold">
         <ArchesMark />
         <div className="leading-tight">
-          <div className="text-sm">McDonald&apos;s Philippines</div>
-          <div className="text-[0.72rem] text-sidebar-foreground/60 font-normal">Customer 360</div>
+          <div className="text-sm">{BRAND_NAME}</div>
+          <div className="text-[0.72rem] text-sidebar-foreground/60 font-normal">
+            McDonald&apos;s PH · {BRAND_SUB}
+          </div>
         </div>
       </div>
     </div>
@@ -94,9 +99,9 @@ function Layout() {
   const location = useLocation();
   const onMember = location.pathname.startsWith('/members/');
   const title = onMember
-    ? 'Customer 360'
+    ? BRAND_SUB
     : (NAV.find((n) => (n.to === '/' ? location.pathname === '/' : location.pathname.startsWith(n.to)))?.label ??
-      'Customer 360');
+      BRAND_SUB);
 
   useEffect(() => {
     // Close the mobile nav when switching to a desktop viewport.
@@ -123,7 +128,7 @@ function Layout() {
               </Button>
               <SheetContent side="left">
                 <SheetHeader>
-                  <SheetTitle>McDonald&apos;s Philippines — Customer 360</SheetTitle>
+                  <SheetTitle>McDonald&apos;s PH — {BRAND_NAME}</SheetTitle>
                 </SheetHeader>
                 <div className="p-4">
                   <NavLinks onClick={() => setMobileNavOpen(false)} />
@@ -133,9 +138,11 @@ function Layout() {
           </div>
           <div>
             <h1 className="text-xl font-semibold leading-tight">
-              McDonald&apos;s Philippines — {title}
+              {BRAND_NAME} — {title}
             </h1>
-            <div className="text-xs text-muted-foreground">GADC · Workshop demo (synthetic data)</div>
+            <div className="text-xs text-muted-foreground">
+              McDonald&apos;s PH (GADC) · Workshop demo (synthetic data)
+            </div>
           </div>
         </header>
         <main className="p-4 md:p-8 max-w-[1400px]">
@@ -152,6 +159,7 @@ const router = createBrowserRouter([
     children: [
       { path: '/', element: <MemberSearch /> },
       { path: '/members/:id', element: <Member360 /> },
+      { path: '/rewards', element: <Rewards /> },
       { path: '/stores', element: <Stores /> },
     ],
   },

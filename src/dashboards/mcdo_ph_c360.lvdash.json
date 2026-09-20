@@ -2,57 +2,62 @@
   "datasets": [
     {
       "name": "ds_members",
-      "displayName": "Customer 360 (members)",
+      "displayName": "Member 360 (MyMcDonald's Rewards)",
       "queryLines": [
-        "SELECT customer_id, region, province, city, loyalty_tier, rfm_segment, churn_risk,\n",
-        "       preferred_channel, signup_channel, favorite_category, favorite_store,\n",
-        "       total_orders, total_spend, avg_order_value, clv_estimate, engagement_score,\n",
-        "       recency_days, tenure_days, rewards_redeemed, full_name, age\n",
+        "SELECT customer_id, region, province, city, current_tier, qualified_tier, tier_status,\n",
+        "       rfm_segment, churn_risk, preferred_channel, favorite_category, full_name,\n",
+        "       points_balance, lifetime_points_earned, lifetime_points_redeemed, points_expired,\n",
+        "       points_earned_12mo, redemptions_count, redemption_rate, points_liability_php,\n",
+        "       total_orders, total_spend, clv_estimate\n",
         "FROM dante_classic_stable_catalog.mcdo_ph_gold.customer_360"
       ],
       "columns": [
-        {"displayName": "Members", "description": "Distinct loyalty members", "expression": "COUNT(`customer_id`)"},
+        {"displayName": "Members", "description": "Distinct rewards members", "expression": "COUNT(`customer_id`)"},
         {"displayName": "Active Members", "description": "Members with >=1 completed order", "expression": "COUNT(CASE WHEN `total_orders` > 0 THEN `customer_id` END)"},
-        {"displayName": "Total Revenue", "description": "Lifetime net revenue", "expression": "SUM(`total_spend`)"},
-        {"displayName": "Total Orders", "description": "Lifetime orders", "expression": "SUM(`total_orders`)"},
-        {"displayName": "Avg Order Value", "description": "Revenue per order", "expression": "SUM(`total_spend`) / NULLIF(SUM(`total_orders`), 0)"},
-        {"displayName": "Repeat Rate", "description": "Share of active members with >1 order", "expression": "COUNT(CASE WHEN `total_orders` > 1 THEN `customer_id` END) * 1.0 / NULLIF(COUNT(CASE WHEN `total_orders` > 0 THEN `customer_id` END), 0)"},
-        {"displayName": "High Churn Members", "description": "Members flagged High churn risk", "expression": "COUNT(CASE WHEN `churn_risk` = 'High' THEN `customer_id` END)"},
-        {"displayName": "Est CLV", "description": "Sum of estimated customer lifetime value", "expression": "SUM(`clv_estimate`)"}
+        {"displayName": "Outstanding Points", "description": "Sum of redeemable point balances", "expression": "SUM(`points_balance`)"},
+        {"displayName": "Points Earned", "description": "Lifetime points earned", "expression": "SUM(`lifetime_points_earned`)"},
+        {"displayName": "Points Redeemed", "description": "Lifetime points redeemed", "expression": "SUM(`lifetime_points_redeemed`)"},
+        {"displayName": "Outstanding Liability", "description": "Estimated peso liability of outstanding points", "expression": "SUM(`points_liability_php`)"},
+        {"displayName": "Redemption Rate", "description": "Points redeemed / points earned", "expression": "SUM(`lifetime_points_redeemed`) * 1.0 / NULLIF(SUM(`lifetime_points_earned`), 0)"},
+        {"displayName": "Members Redeeming", "description": "Members with >=1 redemption", "expression": "COUNT(CASE WHEN `redemptions_count` > 0 THEN `customer_id` END)"},
+        {"displayName": "Downgrade Risk Members", "description": "Held tier above qualified tier", "expression": "COUNT(CASE WHEN `tier_status` = 'Downgrade risk' THEN `customer_id` END)"},
+        {"displayName": "Upgrade Eligible Members", "description": "Qualified tier above held tier", "expression": "COUNT(CASE WHEN `tier_status` = 'Upgrade eligible' THEN `customer_id` END)"},
+        {"displayName": "Total Revenue", "description": "Lifetime net revenue", "expression": "SUM(`total_spend`)"}
       ]
     },
     {
-      "name": "ds_daily",
-      "displayName": "Daily sales",
+      "name": "ds_points",
+      "displayName": "Points economy (daily)",
       "queryLines": [
-        "SELECT order_date, region, channel, orders, revenue, active_customers,\n",
-        "       avg_order_value, promo_discount\n",
-        "FROM dante_classic_stable_catalog.mcdo_ph_gold.daily_sales"
+        "SELECT txn_date, points_earned, bonus_points, points_redeemed, points_expired,\n",
+        "       net_points, redemptions, active_members, outstanding_balance,\n",
+        "       outstanding_liability_php\n",
+        "FROM dante_classic_stable_catalog.mcdo_ph_gold.points_economy"
       ]
     },
     {
-      "name": "ds_stores",
-      "displayName": "Store performance",
+      "name": "ds_rewards",
+      "displayName": "Rewards catalog performance",
       "queryLines": [
-        "SELECT store_id, store_name, region, province, city, store_format,\n",
-        "       latitude, longitude, orders, revenue, avg_order_value,\n",
-        "       unique_customers, drive_thru_share, revenue_per_customer\n",
-        "FROM dante_classic_stable_catalog.mcdo_ph_gold.store_performance"
+        "SELECT reward_id, reward_name, reward_tier, category, point_cost, est_value_php,\n",
+        "       redemptions, points_spent, unique_members, value_delivered_php, pct_of_redemptions\n",
+        "FROM dante_classic_stable_catalog.mcdo_ph_gold.reward_performance"
       ]
     },
     {
-      "name": "ds_category",
-      "displayName": "Category mix",
+      "name": "ds_tiers",
+      "displayName": "Tier migration",
       "queryLines": [
-        "SELECT region, category, is_localized, revenue, units, orders\n",
-        "FROM dante_classic_stable_catalog.mcdo_ph_gold.category_mix"
+        "SELECT current_tier, current_tier_rank, qualified_tier, qualified_tier_rank,\n",
+        "       tier_status, members, points_balance, points_liability_php\n",
+        "FROM dante_classic_stable_catalog.mcdo_ph_gold.tier_migration"
       ]
     }
   ],
   "pages": [
     {
       "name": "overview",
-      "displayName": "Customer 360",
+      "displayName": "Membership Overview",
       "pageType": "PAGE_TYPE_CANVAS",
       "layoutVersion": "GRID_V1",
       "layout": [
@@ -61,8 +66,8 @@
             "name": "hdr",
             "multilineTextboxSpec": {
               "lines": [
-                "# 🍟 McDonald's Philippines — Customer 360\n",
-                "**GADC loyalty analytics** · members, spend, retention and network performance. Synthetic demo data. KPIs and segments come from the governed Gold `customer_360` mart; use the **Filters** page to slice by region or tier."
+                "# 🍟 MyMcDonald's Rewards — Membership Analytics\n",
+                "**McDonald's Philippines (GADC)** · the loyalty **points economy** — earn, redeem, breakage, outstanding liability, and status-tier health. Synthetic demo data from the governed Gold `customer_360` mart and points-economy marts. Use the **Filters** page to slice by region and tier."
               ]
             }
           },
@@ -78,146 +83,154 @@
         },
         {
           "widget": {
-            "name": "kpi_revenue",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "measure(Total Revenue)", "expression": "MEASURE(`Total Revenue`)"}], "disaggregated": false}}],
-            "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Lifetime Revenue (₱)", "showTitle": true}, "encodings": {"value": {"fieldName": "measure(Total Revenue)", "displayName": "Revenue", "format": {"type": "number-currency", "currencyCode": "PHP", "decimalPlaces": {"type": "max", "places": 0}, "abbreviation": "compact"}}}}
+            "name": "kpi_points",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "measure(Outstanding Points)", "expression": "MEASURE(`Outstanding Points`)"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Outstanding Points", "showTitle": true}, "encodings": {"value": {"fieldName": "measure(Outstanding Points)", "displayName": "Points", "format": {"type": "number-plain", "decimalPlaces": {"type": "max", "places": 0}, "abbreviation": "compact"}}}}
           },
           "position": {"x": 3, "y": 2, "width": 3, "height": 3}
         },
         {
           "widget": {
-            "name": "kpi_aov",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "measure(Avg Order Value)", "expression": "MEASURE(`Avg Order Value`)"}], "disaggregated": false}}],
-            "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Avg Order Value (₱)", "showTitle": true}, "encodings": {"value": {"fieldName": "measure(Avg Order Value)", "displayName": "AOV", "format": {"type": "number-currency", "currencyCode": "PHP", "decimalPlaces": {"type": "exact", "places": 2}}}}}
+            "name": "kpi_liability",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "measure(Outstanding Liability)", "expression": "MEASURE(`Outstanding Liability`)"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Outstanding Liability (₱)", "showTitle": true}, "encodings": {"value": {"fieldName": "measure(Outstanding Liability)", "displayName": "Liability", "format": {"type": "number-currency", "currencyCode": "PHP", "decimalPlaces": {"type": "max", "places": 1}, "abbreviation": "compact"}}}}
           },
           "position": {"x": 6, "y": 2, "width": 3, "height": 3}
         },
         {
           "widget": {
-            "name": "kpi_repeat",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "measure(Repeat Rate)", "expression": "MEASURE(`Repeat Rate`)"}], "disaggregated": false}}],
-            "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Repeat Rate", "showTitle": true}, "encodings": {"value": {"fieldName": "measure(Repeat Rate)", "displayName": "Repeat Rate", "format": {"type": "number-percent", "decimalPlaces": {"type": "max", "places": 1}}}}}
+            "name": "kpi_redrate",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "measure(Redemption Rate)", "expression": "MEASURE(`Redemption Rate`)"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Redemption Rate", "showTitle": true}, "encodings": {"value": {"fieldName": "measure(Redemption Rate)", "displayName": "Redemption Rate", "format": {"type": "number-percent", "decimalPlaces": {"type": "max", "places": 1}}}}}
           },
           "position": {"x": 9, "y": 2, "width": 3, "height": 3}
         },
         {
           "widget": {
-            "name": "revenue_trend",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_daily", "fields": [{"name": "daily(order_date)", "expression": "DATE_TRUNC(\"DAY\", `order_date`)"}, {"name": "sum(revenue)", "expression": "SUM(`revenue`)"}], "disaggregated": false}}],
-            "spec": {"version": 3, "widgetType": "line", "frame": {"title": "Daily net revenue (₱)", "showTitle": true}, "encodings": {"x": {"fieldName": "daily(order_date)", "scale": {"type": "temporal"}, "displayName": "Date"}, "y": {"fieldName": "sum(revenue)", "scale": {"type": "quantitative"}, "displayName": "Revenue"}}}
+            "name": "liability_trend",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_points", "fields": [{"name": "monthly(txn_date)", "expression": "DATE_TRUNC(\"MONTH\", `txn_date`)"}, {"name": "max(outstanding_liability_php)", "expression": "MAX(`outstanding_liability_php`)"}], "disaggregated": false}}],
+            "spec": {"version": 3, "widgetType": "line", "frame": {"title": "Outstanding points liability (₱, month-end)", "showTitle": true}, "encodings": {"x": {"fieldName": "monthly(txn_date)", "scale": {"type": "temporal"}, "displayName": "Month"}, "y": {"fieldName": "max(outstanding_liability_php)", "scale": {"type": "quantitative"}, "displayName": "Liability (₱)"}}}
           },
           "position": {"x": 0, "y": 5, "width": 8, "height": 5}
         },
         {
           "widget": {
             "name": "tier_pie",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "measure(Members)", "expression": "MEASURE(`Members`)"}, {"name": "loyalty_tier", "expression": "`loyalty_tier`"}], "disaggregated": false}}],
-            "spec": {"version": 3, "widgetType": "pie", "frame": {"title": "Members by loyalty tier", "showTitle": true}, "encodings": {"angle": {"fieldName": "measure(Members)", "scale": {"type": "quantitative"}, "displayName": "Members"}, "color": {"fieldName": "loyalty_tier", "scale": {"type": "categorical"}, "displayName": "Tier"}, "label": {"show": true}}}
+            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "measure(Members)", "expression": "MEASURE(`Members`)"}, {"name": "current_tier", "expression": "`current_tier`"}], "disaggregated": false}}],
+            "spec": {"version": 3, "widgetType": "pie", "frame": {"title": "Members by status tier", "showTitle": true}, "encodings": {"angle": {"fieldName": "measure(Members)", "scale": {"type": "quantitative"}, "displayName": "Members"}, "color": {"fieldName": "current_tier", "scale": {"type": "categorical"}, "displayName": "Tier"}, "label": {"show": true}}}
           },
           "position": {"x": 8, "y": 5, "width": 4, "height": 5}
         },
         {
           "widget": {
-            "name": "rfm_bar",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "rfm_segment", "expression": "`rfm_segment`"}, {"name": "measure(Members)", "expression": "MEASURE(`Members`)"}], "disaggregated": false}}],
-            "spec": {"version": 3, "widgetType": "bar", "frame": {"title": "Members by RFM segment", "showTitle": true}, "encodings": {"x": {"fieldName": "rfm_segment", "scale": {"type": "categorical"}, "displayName": "Segment"}, "y": {"fieldName": "measure(Members)", "scale": {"type": "quantitative"}, "displayName": "Members"}}}
+            "name": "tier_status_bar",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "tier_status", "expression": "`tier_status`"}, {"name": "measure(Members)", "expression": "MEASURE(`Members`)"}], "disaggregated": false}}],
+            "spec": {"version": 3, "widgetType": "bar", "frame": {"title": "Members by tier status", "showTitle": true}, "encodings": {"x": {"fieldName": "tier_status", "scale": {"type": "categorical"}, "displayName": "Tier status"}, "y": {"fieldName": "measure(Members)", "scale": {"type": "quantitative"}, "displayName": "Members"}, "color": {"fieldName": "tier_status", "scale": {"type": "categorical", "mappings": [{"value": "Downgrade risk", "color": "#DA291C"}, {"value": "Upgrade eligible", "color": "#FFC72C"}, {"value": "On track", "color": "#3C7A3C"}]}}}}
           },
           "position": {"x": 0, "y": 10, "width": 6, "height": 5}
         },
         {
           "widget": {
-            "name": "churn_bar",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "churn_risk", "expression": "`churn_risk`"}, {"name": "measure(Members)", "expression": "MEASURE(`Members`)"}], "disaggregated": false}}],
-            "spec": {"version": 3, "widgetType": "bar", "frame": {"title": "Members by churn risk", "showTitle": true}, "encodings": {"x": {"fieldName": "churn_risk", "scale": {"type": "categorical"}, "displayName": "Churn risk"}, "y": {"fieldName": "measure(Members)", "scale": {"type": "quantitative"}, "displayName": "Members"}, "color": {"fieldName": "churn_risk", "scale": {"type": "categorical", "mappings": [{"value": "High", "color": "#DA291C"}, {"value": "Medium", "color": "#FFC72C"}, {"value": "Low", "color": "#3C7A3C"}, {"value": "N/A — Prospect", "color": "#B0B0B0"}]}}}}
+            "name": "region_liability_bar",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "region", "expression": "`region`"}, {"name": "measure(Outstanding Liability)", "expression": "MEASURE(`Outstanding Liability`)"}], "disaggregated": false, "orders": [{"direction": "DESC", "expression": "MEASURE(`Outstanding Liability`)"}]}}],
+            "spec": {"version": 3, "widgetType": "bar", "frame": {"title": "Points liability by region (₱)", "showTitle": true}, "encodings": {"x": {"fieldName": "region", "scale": {"type": "categorical"}, "displayName": "Region"}, "y": {"fieldName": "measure(Outstanding Liability)", "scale": {"type": "quantitative"}, "displayName": "Liability (₱)"}}}
           },
           "position": {"x": 6, "y": 10, "width": 6, "height": 5}
         },
         {
           "widget": {
-            "name": "region_bar",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "region", "expression": "`region`"}, {"name": "measure(Total Revenue)", "expression": "MEASURE(`Total Revenue`)"}], "disaggregated": false}}],
-            "spec": {"version": 3, "widgetType": "bar", "frame": {"title": "Lifetime revenue by region (₱)", "showTitle": true}, "encodings": {"x": {"fieldName": "region", "scale": {"type": "categorical"}, "displayName": "Region"}, "y": {"fieldName": "measure(Total Revenue)", "scale": {"type": "quantitative"}, "displayName": "Revenue"}}}
-          },
-          "position": {"x": 0, "y": 15, "width": 6, "height": 5}
-        },
-        {
-          "widget": {
-            "name": "channel_pie",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_daily", "fields": [{"name": "sum(revenue)", "expression": "SUM(`revenue`)"}, {"name": "channel", "expression": "`channel`"}], "disaggregated": false}}],
-            "spec": {"version": 3, "widgetType": "pie", "frame": {"title": "Revenue by channel (₱)", "showTitle": true}, "encodings": {"angle": {"fieldName": "sum(revenue)", "scale": {"type": "quantitative"}, "displayName": "Revenue"}, "color": {"fieldName": "channel", "scale": {"type": "categorical"}, "displayName": "Channel"}, "label": {"show": true}}}
-          },
-          "position": {"x": 6, "y": 15, "width": 6, "height": 5}
-        },
-        {
-          "widget": {
             "name": "top_members",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "full_name", "expression": "`full_name`"}, {"name": "region", "expression": "`region`"}, {"name": "loyalty_tier", "expression": "`loyalty_tier`"}, {"name": "rfm_segment", "expression": "`rfm_segment`"}, {"name": "total_orders", "expression": "`total_orders`"}, {"name": "total_spend", "expression": "`total_spend`"}, {"name": "clv_estimate", "expression": "`clv_estimate`"}, {"name": "churn_risk", "expression": "`churn_risk`"}], "disaggregated": true, "orders": [{"direction": "DESC", "expression": "`clv_estimate`"}]}}],
-            "spec": {"version": 2, "widgetType": "table", "frame": {"title": "Top members by estimated CLV", "showTitle": true}, "encodings": {"columns": [{"fieldName": "full_name", "displayName": "Member"}, {"fieldName": "region", "displayName": "Region"}, {"fieldName": "loyalty_tier", "displayName": "Tier"}, {"fieldName": "rfm_segment", "displayName": "Segment"}, {"fieldName": "total_orders", "displayName": "Orders"}, {"fieldName": "total_spend", "displayName": "Spend (₱)", "format": {"type": "number-currency", "currencyCode": "PHP", "decimalPlaces": {"type": "exact", "places": 0}}}, {"fieldName": "clv_estimate", "displayName": "Est CLV (₱)", "format": {"type": "number-currency", "currencyCode": "PHP", "decimalPlaces": {"type": "exact", "places": 0}}}, {"fieldName": "churn_risk", "displayName": "Churn"}]}}
+            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "full_name", "expression": "`full_name`"}, {"name": "region", "expression": "`region`"}, {"name": "current_tier", "expression": "`current_tier`"}, {"name": "qualified_tier", "expression": "`qualified_tier`"}, {"name": "tier_status", "expression": "`tier_status`"}, {"name": "points_balance", "expression": "`points_balance`"}, {"name": "lifetime_points_earned", "expression": "`lifetime_points_earned`"}, {"name": "redemptions_count", "expression": "`redemptions_count`"}, {"name": "total_spend", "expression": "`total_spend`"}], "disaggregated": true, "orders": [{"direction": "DESC", "expression": "`points_balance`"}]}}],
+            "spec": {"version": 2, "widgetType": "table", "frame": {"title": "Top members by points balance", "showTitle": true}, "encodings": {"columns": [{"fieldName": "full_name", "displayName": "Member"}, {"fieldName": "region", "displayName": "Region"}, {"fieldName": "current_tier", "displayName": "Tier"}, {"fieldName": "qualified_tier", "displayName": "Qualifies"}, {"fieldName": "tier_status", "displayName": "Status"}, {"fieldName": "points_balance", "displayName": "Points", "format": {"type": "number-plain", "decimalPlaces": {"type": "exact", "places": 0}}}, {"fieldName": "lifetime_points_earned", "displayName": "Earned", "format": {"type": "number-plain", "decimalPlaces": {"type": "exact", "places": 0}}}, {"fieldName": "redemptions_count", "displayName": "Redemptions"}, {"fieldName": "total_spend", "displayName": "Spend (₱)", "format": {"type": "number-currency", "currencyCode": "PHP", "decimalPlaces": {"type": "exact", "places": 0}}}]}}
           },
-          "position": {"x": 0, "y": 20, "width": 12, "height": 6}
+          "position": {"x": 0, "y": 15, "width": 12, "height": 6}
         }
       ]
     },
     {
-      "name": "stores",
-      "displayName": "Stores & Menu",
+      "name": "rewards",
+      "displayName": "Rewards & Points Economy",
       "pageType": "PAGE_TYPE_CANVAS",
       "layoutVersion": "GRID_V1",
       "layout": [
         {
           "widget": {
             "name": "hdr2",
-            "multilineTextboxSpec": {"lines": ["# 🏪 Network & Menu Performance\n", "Store-level revenue, drive-thru mix, and menu-category performance across the McDonald's PH network."]}
+            "multilineTextboxSpec": {"lines": ["# 🎁 Rewards Catalog & Points Flow\n", "Which rewards members redeem, the peso value delivered, the daily earn/redeem flow, and how held tiers line up against the tiers members' points actually qualify for."]}
           },
           "position": {"x": 0, "y": 0, "width": 12, "height": 2}
         },
         {
           "widget": {
-            "name": "kpi_stores",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_stores", "fields": [{"name": "count(store_id)", "expression": "COUNT(`store_id`)"}], "disaggregated": false}}],
-            "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Stores", "showTitle": true}, "encodings": {"value": {"fieldName": "count(store_id)", "displayName": "Stores"}}}
+            "name": "kpi_redemptions",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_rewards", "fields": [{"name": "sum(redemptions)", "expression": "SUM(`redemptions`)"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Total Redemptions", "showTitle": true}, "encodings": {"value": {"fieldName": "sum(redemptions)", "displayName": "Redemptions", "format": {"type": "number-plain", "decimalPlaces": {"type": "exact", "places": 0}}}}}
           },
-          "position": {"x": 0, "y": 2, "width": 4, "height": 3}
+          "position": {"x": 0, "y": 2, "width": 3, "height": 3}
         },
         {
           "widget": {
-            "name": "kpi_netrev",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_stores", "fields": [{"name": "sum(revenue)", "expression": "SUM(`revenue`)"}], "disaggregated": false}}],
-            "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Network Revenue (₱)", "showTitle": true}, "encodings": {"value": {"fieldName": "sum(revenue)", "displayName": "Revenue", "format": {"type": "number-currency", "currencyCode": "PHP", "decimalPlaces": {"type": "max", "places": 0}, "abbreviation": "compact"}}}}
+            "name": "kpi_points_spent",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_rewards", "fields": [{"name": "sum(points_spent)", "expression": "SUM(`points_spent`)"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Points Redeemed", "showTitle": true}, "encodings": {"value": {"fieldName": "sum(points_spent)", "displayName": "Points", "format": {"type": "number-plain", "decimalPlaces": {"type": "max", "places": 0}, "abbreviation": "compact"}}}}
           },
-          "position": {"x": 4, "y": 2, "width": 4, "height": 3}
+          "position": {"x": 3, "y": 2, "width": 3, "height": 3}
         },
         {
           "widget": {
-            "name": "kpi_dt",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_stores", "fields": [{"name": "avg(drive_thru_share)", "expression": "AVG(`drive_thru_share`)"}], "disaggregated": false}}],
-            "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Avg Drive-Thru Share", "showTitle": true}, "encodings": {"value": {"fieldName": "avg(drive_thru_share)", "displayName": "Drive-Thru", "format": {"type": "number-percent", "decimalPlaces": {"type": "max", "places": 1}}}}}
+            "name": "kpi_value",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_rewards", "fields": [{"name": "sum(value_delivered_php)", "expression": "SUM(`value_delivered_php`)"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Value Delivered (₱)", "showTitle": true}, "encodings": {"value": {"fieldName": "sum(value_delivered_php)", "displayName": "Value", "format": {"type": "number-currency", "currencyCode": "PHP", "decimalPlaces": {"type": "max", "places": 1}, "abbreviation": "compact"}}}}
           },
-          "position": {"x": 8, "y": 2, "width": 4, "height": 3}
+          "position": {"x": 6, "y": 2, "width": 3, "height": 3}
         },
         {
           "widget": {
-            "name": "store_map",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_stores", "fields": [{"name": "latitude", "expression": "`latitude`"}, {"name": "longitude", "expression": "`longitude`"}, {"name": "sum(revenue)", "expression": "SUM(`revenue`)"}, {"name": "sum(orders)", "expression": "SUM(`orders`)"}], "disaggregated": false}}],
-            "spec": {"version": 2, "widgetType": "symbol-map", "frame": {"title": "Stores by revenue", "showTitle": true}, "mark": {"opacity": 0.75}, "encodings": {"coordinates": {"latitude": {"fieldName": "latitude"}, "longitude": {"fieldName": "longitude"}}, "color": {"fieldName": "sum(revenue)", "scale": {"type": "quantitative", "colorRamp": {"mode": "custom-sequential", "colors": {"start": "#FFC72C", "end": "#DA291C"}}}}, "size": {"fieldName": "sum(orders)", "scale": {"type": "quantitative"}}}}
+            "name": "kpi_redeeming",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "measure(Members Redeeming)", "expression": "MEASURE(`Members Redeeming`)"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Members Redeeming", "showTitle": true}, "encodings": {"value": {"fieldName": "measure(Members Redeeming)", "displayName": "Members", "format": {"type": "number-plain", "decimalPlaces": {"type": "exact", "places": 0}}}}}
           },
-          "position": {"x": 0, "y": 5, "width": 8, "height": 6}
+          "position": {"x": 9, "y": 2, "width": 3, "height": 3}
         },
         {
           "widget": {
-            "name": "cat_bar",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_category", "fields": [{"name": "category", "expression": "`category`"}, {"name": "sum(revenue)", "expression": "SUM(`revenue`)"}], "disaggregated": false, "orders": [{"direction": "DESC", "expression": "SUM(`revenue`)"}]}}],
-            "spec": {"version": 3, "widgetType": "bar", "frame": {"title": "Revenue by menu category (₱)", "showTitle": true}, "encodings": {"x": {"fieldName": "sum(revenue)", "scale": {"type": "quantitative"}, "displayName": "Revenue"}, "y": {"fieldName": "category", "scale": {"type": "categorical"}, "displayName": "Category"}}}
+            "name": "reward_redemptions_bar",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_rewards", "fields": [{"name": "reward_name", "expression": "`reward_name`"}, {"name": "sum(redemptions)", "expression": "SUM(`redemptions`)"}], "disaggregated": false, "orders": [{"direction": "DESC", "expression": "SUM(`redemptions`)"}]}}],
+            "spec": {"version": 3, "widgetType": "bar", "frame": {"title": "Redemptions by reward", "showTitle": true}, "encodings": {"x": {"fieldName": "sum(redemptions)", "scale": {"type": "quantitative"}, "displayName": "Redemptions"}, "y": {"fieldName": "reward_name", "scale": {"type": "categorical"}, "displayName": "Reward"}}}
           },
-          "position": {"x": 8, "y": 5, "width": 4, "height": 6}
+          "position": {"x": 0, "y": 5, "width": 6, "height": 6}
         },
         {
           "widget": {
-            "name": "store_table",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_stores", "fields": [{"name": "store_name", "expression": "`store_name`"}, {"name": "region", "expression": "`region`"}, {"name": "store_format", "expression": "`store_format`"}, {"name": "orders", "expression": "`orders`"}, {"name": "revenue", "expression": "`revenue`"}, {"name": "unique_customers", "expression": "`unique_customers`"}, {"name": "avg_order_value", "expression": "`avg_order_value`"}, {"name": "drive_thru_share", "expression": "`drive_thru_share`"}], "disaggregated": true, "orders": [{"direction": "DESC", "expression": "`revenue`"}]}}],
-            "spec": {"version": 2, "widgetType": "table", "frame": {"title": "Store performance", "showTitle": true}, "encodings": {"columns": [{"fieldName": "store_name", "displayName": "Store"}, {"fieldName": "region", "displayName": "Region"}, {"fieldName": "store_format", "displayName": "Format"}, {"fieldName": "orders", "displayName": "Orders"}, {"fieldName": "revenue", "displayName": "Revenue (₱)", "format": {"type": "number-currency", "currencyCode": "PHP", "decimalPlaces": {"type": "exact", "places": 0}}}, {"fieldName": "unique_customers", "displayName": "Customers"}, {"fieldName": "avg_order_value", "displayName": "AOV (₱)", "format": {"type": "number-currency", "currencyCode": "PHP", "decimalPlaces": {"type": "exact", "places": 0}}}, {"fieldName": "drive_thru_share", "displayName": "Drive-Thru %", "format": {"type": "number-percent", "decimalPlaces": {"type": "max", "places": 1}}}]}}
+            "name": "value_by_tier_bar",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_rewards", "fields": [{"name": "reward_tier", "expression": "`reward_tier`"}, {"name": "sum(value_delivered_php)", "expression": "SUM(`value_delivered_php`)"}], "disaggregated": false, "orders": [{"direction": "DESC", "expression": "SUM(`value_delivered_php`)"}]}}],
+            "spec": {"version": 3, "widgetType": "bar", "frame": {"title": "Value delivered by reward tier (₱)", "showTitle": true}, "encodings": {"x": {"fieldName": "reward_tier", "scale": {"type": "categorical"}, "displayName": "Reward tier"}, "y": {"fieldName": "sum(value_delivered_php)", "scale": {"type": "quantitative"}, "displayName": "Value (₱)"}}}
           },
-          "position": {"x": 0, "y": 11, "width": 12, "height": 7}
+          "position": {"x": 6, "y": 5, "width": 6, "height": 6}
+        },
+        {
+          "widget": {
+            "name": "points_flow",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_points", "fields": [{"name": "monthly(txn_date)", "expression": "DATE_TRUNC(\"MONTH\", `txn_date`)"}, {"name": "sum(points_earned)", "expression": "SUM(`points_earned`)"}], "disaggregated": false}}],
+            "spec": {"version": 3, "widgetType": "line", "frame": {"title": "Points earned per month", "showTitle": true}, "encodings": {"x": {"fieldName": "monthly(txn_date)", "scale": {"type": "temporal"}, "displayName": "Month"}, "y": {"fieldName": "sum(points_earned)", "scale": {"type": "quantitative"}, "displayName": "Points earned"}}}
+          },
+          "position": {"x": 0, "y": 11, "width": 6, "height": 5}
+        },
+        {
+          "widget": {
+            "name": "tier_migration_bar",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_tiers", "fields": [{"name": "current_tier", "expression": "`current_tier`"}, {"name": "qualified_tier", "expression": "`qualified_tier`"}, {"name": "sum(members)", "expression": "SUM(`members`)"}], "disaggregated": false}}],
+            "spec": {"version": 3, "widgetType": "bar", "frame": {"title": "Held tier vs. qualified tier (members)", "showTitle": true}, "encodings": {"x": {"fieldName": "current_tier", "scale": {"type": "categorical"}, "displayName": "Held tier"}, "y": {"fieldName": "sum(members)", "scale": {"type": "quantitative"}, "displayName": "Members"}, "color": {"fieldName": "qualified_tier", "scale": {"type": "categorical"}, "displayName": "Qualifies for"}}}
+          },
+          "position": {"x": 6, "y": 11, "width": 6, "height": 5}
+        },
+        {
+          "widget": {
+            "name": "rewards_table",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_rewards", "fields": [{"name": "reward_name", "expression": "`reward_name`"}, {"name": "reward_tier", "expression": "`reward_tier`"}, {"name": "category", "expression": "`category`"}, {"name": "point_cost", "expression": "`point_cost`"}, {"name": "redemptions", "expression": "`redemptions`"}, {"name": "unique_members", "expression": "`unique_members`"}, {"name": "points_spent", "expression": "`points_spent`"}, {"name": "value_delivered_php", "expression": "`value_delivered_php`"}], "disaggregated": true, "orders": [{"direction": "DESC", "expression": "`redemptions`"}]}}],
+            "spec": {"version": 2, "widgetType": "table", "frame": {"title": "Rewards catalog", "showTitle": true}, "encodings": {"columns": [{"fieldName": "reward_name", "displayName": "Reward"}, {"fieldName": "reward_tier", "displayName": "Tier"}, {"fieldName": "category", "displayName": "Category"}, {"fieldName": "point_cost", "displayName": "Point cost", "format": {"type": "number-plain", "decimalPlaces": {"type": "exact", "places": 0}}}, {"fieldName": "redemptions", "displayName": "Redemptions"}, {"fieldName": "unique_members", "displayName": "Members"}, {"fieldName": "points_spent", "displayName": "Points spent", "format": {"type": "number-plain", "decimalPlaces": {"type": "exact", "places": 0}}}, {"fieldName": "value_delivered_php", "displayName": "Value (₱)", "format": {"type": "number-currency", "currencyCode": "PHP", "decimalPlaces": {"type": "exact", "places": 0}}}]}}
+          },
+          "position": {"x": 0, "y": 16, "width": 12, "height": 6}
         }
       ]
     },
@@ -230,29 +243,27 @@
         {
           "widget": {
             "name": "f_region",
-            "queries": [
-              {"name": "qm", "query": {"datasetName": "ds_members", "fields": [{"name": "region", "expression": "`region`"}], "disaggregated": false}},
-              {"name": "qd", "query": {"datasetName": "ds_daily", "fields": [{"name": "region", "expression": "`region`"}], "disaggregated": false}},
-              {"name": "qs", "query": {"datasetName": "ds_stores", "fields": [{"name": "region", "expression": "`region`"}], "disaggregated": false}},
-              {"name": "qc", "query": {"datasetName": "ds_category", "fields": [{"name": "region", "expression": "`region`"}], "disaggregated": false}}
-            ],
-            "spec": {"version": 2, "widgetType": "filter-multi-select", "frame": {"title": "Region", "showTitle": true}, "encodings": {"fields": [{"fieldName": "region", "queryName": "qm", "displayName": "Region"}, {"fieldName": "region", "queryName": "qd"}, {"fieldName": "region", "queryName": "qs"}, {"fieldName": "region", "queryName": "qc"}]}}
+            "queries": [{"name": "qm", "query": {"datasetName": "ds_members", "fields": [{"name": "region", "expression": "`region`"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "filter-multi-select", "frame": {"title": "Region", "showTitle": true}, "encodings": {"fields": [{"fieldName": "region", "queryName": "qm", "displayName": "Region"}]}}
           },
           "position": {"x": 0, "y": 0, "width": 4, "height": 2}
         },
         {
           "widget": {
             "name": "f_tier",
-            "queries": [{"name": "qt", "query": {"datasetName": "ds_members", "fields": [{"name": "loyalty_tier", "expression": "`loyalty_tier`"}], "disaggregated": false}}],
-            "spec": {"version": 2, "widgetType": "filter-multi-select", "frame": {"title": "Loyalty tier", "showTitle": true}, "encodings": {"fields": [{"fieldName": "loyalty_tier", "queryName": "qt", "displayName": "Tier"}]}}
+            "queries": [
+              {"name": "qt", "query": {"datasetName": "ds_members", "fields": [{"name": "current_tier", "expression": "`current_tier`"}], "disaggregated": false}},
+              {"name": "qtt", "query": {"datasetName": "ds_tiers", "fields": [{"name": "current_tier", "expression": "`current_tier`"}], "disaggregated": false}}
+            ],
+            "spec": {"version": 2, "widgetType": "filter-multi-select", "frame": {"title": "Status tier", "showTitle": true}, "encodings": {"fields": [{"fieldName": "current_tier", "queryName": "qt", "displayName": "Tier"}, {"fieldName": "current_tier", "queryName": "qtt"}]}}
           },
           "position": {"x": 4, "y": 0, "width": 4, "height": 2}
         },
         {
           "widget": {
             "name": "f_date",
-            "queries": [{"name": "qdate", "query": {"datasetName": "ds_daily", "fields": [{"name": "order_date", "expression": "`order_date`"}], "disaggregated": false}}],
-            "spec": {"version": 2, "widgetType": "filter-date-range-picker", "frame": {"title": "Order date", "showTitle": true}, "encodings": {"fields": [{"fieldName": "order_date", "queryName": "qdate"}]}}
+            "queries": [{"name": "qdate", "query": {"datasetName": "ds_points", "fields": [{"name": "txn_date", "expression": "`txn_date`"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "filter-date-range-picker", "frame": {"title": "Transaction date", "showTitle": true}, "encodings": {"fields": [{"fieldName": "txn_date", "queryName": "qdate"}]}}
           },
           "position": {"x": 8, "y": 0, "width": 4, "height": 2}
         }

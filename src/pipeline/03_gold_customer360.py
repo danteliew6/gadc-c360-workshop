@@ -1,10 +1,16 @@
-"""Module 2 · Gold — curated Customer 360 + business marts.
+"""Module 2 · Gold — curated Member 360 + MyMcDonald's Rewards marts.
 
 Materialized views published to the Gold schema (fully-qualified names). The
-centerpiece is `customer_360`: one row per member enriched with RFM scores,
-CLV estimate, churn risk, favorite store / category / channel, and app
-engagement. Supporting marts power the AI/BI dashboard (Module 3) and the
-Lakebase-backed app (Module 4).
+centerpiece is `customer_360`: one row per member enriched with the loyalty
+**points economy** (balance, lifetime earned/redeemed/expired, redemption rate,
+qualified status tier, points liability) plus RFM scores, CLV estimate, churn
+risk, and favorites. Supporting marts model the rewards program itself:
+
+* `points_economy`   — daily earn/redeem/expire and running outstanding balance.
+* `reward_performance` — per-reward redemptions, points spent, and peso value.
+* `tier_migration`   — held-tier × qualified-tier transition matrix.
+
+These power the AI/BI dashboard (Module 3) and the Lakebase-backed app (Module 4).
 """
 
 from pyspark import pipelines as dp
@@ -14,6 +20,28 @@ from pyspark.sql import Window as W
 CATALOG = spark.conf.get("workshop.catalog")
 BRONZE = spark.conf.get("workshop.bronze_schema")
 GOLD = spark.conf.get("workshop.gold_schema")
+
+# Blended peso value of one point — used for the outstanding points-liability
+# estimate. Mirrors POINT_VALUE_PHP in the data generator.
+POINT_VALUE_PHP = 0.04
+# Rolling-12mo earned-point thresholds that qualify a member for each status tier
+# (must match dim_tier / TIER_DEF in the generator).
+TIER_THRESHOLDS = [("Platinum", 4, 40000), ("Gold", 3, 15000), ("Silver", 2, 5000), ("Member", 1, 0)]
+
+
+def _tier_col(earned, want_rank=False):
+    """Map a rolling-12mo earned-points column to its qualified status tier
+    (name, or rank 1-4 when want_rank). Nested CASE, highest threshold wins."""
+    out = F.lit(1 if want_rank else "Member")
+    for name, rank, thresh in reversed(TIER_THRESHOLDS[:-1]):
+        out = F.when(earned >= thresh, F.lit(rank if want_rank else name)).otherwise(out)
+    return out
+
+
+def _rank_name(rank_col):
+    """Map a status-tier rank (1-4) back to its tier name."""
+    return (F.when(rank_col == 4, "Platinum").when(rank_col == 3, "Gold")
+            .when(rank_col == 2, "Silver").otherwise("Member"))
 
 
 def gold(tbl: str) -> str:
@@ -107,6 +135,26 @@ def _cust_engagement():
     )
 
 
+@dp.temporary_view
+def _member_points():
+    """Per-member MyMcDonald's Rewards points rollup from the ledger."""
+    earn_types = F.col("txn_type").isin("EARN", "BONUS")
+    yr = F.expr("current_timestamp() - interval 365 days")
+    return (
+        spark.read.table("points_ledger_clean").groupBy("customer_id").agg(
+            F.sum("points").alias("_net_points"),
+            F.sum(F.when(earn_types, F.col("points")).otherwise(0)).alias("lifetime_points_earned"),
+            F.sum(F.when(F.col("txn_type") == "REDEEM", -F.col("points")).otherwise(0)).alias("lifetime_points_redeemed"),
+            F.sum(F.when(F.col("txn_type") == "EXPIRE", -F.col("points")).otherwise(0)).alias("points_expired"),
+            F.sum(F.when(F.col("txn_type") == "BONUS", F.col("points")).otherwise(0)).alias("bonus_points"),
+            F.sum(F.when(earn_types & (F.col("txn_ts") >= yr), F.col("points")).otherwise(0)).alias("points_earned_12mo"),
+            F.sum(F.when(F.col("txn_type") == "REDEEM", 1).otherwise(0)).alias("redemptions_count"),
+            F.max(F.when(F.col("txn_type") == "REDEEM", F.col("txn_date"))).alias("last_redeem_date"),
+            F.max(F.when(earn_types, F.col("txn_date"))).alias("last_earn_date"),
+        )
+    )
+
+
 # ---------------------------------------------------------------------------
 # GOLD: customer_360
 # ---------------------------------------------------------------------------
@@ -114,9 +162,11 @@ def _cust_engagement():
     name=gold("customer_360"),
     comment="One row per loyalty member: profile + RFM + CLV + churn + favorites + engagement.",
     table_properties={"quality": "gold"},
-    # Cluster on early columns — Delta collects stats on the first 32 columns,
-    # and the derived rfm_segment sits beyond that window.
-    cluster_by=["region", "loyalty_tier"],
+    # Cluster on `region` only: Delta collects stats on the first 32 columns and
+    # the derived tier/points columns are appended well beyond that window, so
+    # they can't be clustering keys. Tier filtering is served by the metric view
+    # and the Lakebase `current_tier` index, not Gold clustering.
+    cluster_by=["region"],
 )
 def customer_360():
     cust = (
@@ -133,6 +183,7 @@ def customer_360():
         .join(spark.read.table("_cust_fav_channel"), "customer_id", "left")
         .join(spark.read.table("_cust_fav_category"), "customer_id", "left")
         .join(spark.read.table("_cust_engagement"), "customer_id", "left")
+        .join(spark.read.table("_member_points"), "customer_id", "left")
         .withColumn("total_orders", F.coalesce("total_orders", F.lit(0)))
         .withColumn("total_spend", F.coalesce("total_spend", F.lit(0).cast("decimal(14,2)")))
         .withColumn("recency_days", F.datediff(F.current_date(), F.col("last_order_date")))
@@ -170,11 +221,54 @@ def customer_360():
             .otherwise(F.col("total_spend")), 2))
         .withColumn("engagement_score", F.round(
             F.coalesce(F.col("active_days"), F.lit(0)) * 2
-            + F.coalesce(F.col("rewards_redeemed"), F.lit(0)) * 5
+            + F.coalesce(F.col("redemptions_count"), F.lit(0)) * 5
             + F.coalesce(F.col("total_orders"), F.lit(0)) * 3, 0))
         .withColumn("full_name", F.concat_ws(" ", "first_name", "last_name"))
         .withColumn("age", (F.datediff(F.current_date(), F.col("birth_date")) / 365).cast("int"))
+    )
+
+    # ── MyMcDonald's Rewards points economy ────────────────────────────────
+    df = (
+        df
+        .withColumn("lifetime_points_earned", F.coalesce("lifetime_points_earned", F.lit(0)))
+        .withColumn("lifetime_points_redeemed", F.coalesce("lifetime_points_redeemed", F.lit(0)))
+        .withColumn("points_expired", F.coalesce("points_expired", F.lit(0)))
+        .withColumn("bonus_points", F.coalesce("bonus_points", F.lit(0)))
+        .withColumn("points_earned_12mo", F.coalesce("points_earned_12mo", F.lit(0)))
+        .withColumn("redemptions_count", F.coalesce("redemptions_count", F.lit(0)))
+        # Displayed balance can't go negative (independent synthetic redeem/expire).
+        .withColumn("points_balance", F.greatest(F.coalesce("_net_points", F.lit(0)), F.lit(0)))
+        .withColumn("points_liability_php",
+                    F.round(F.col("points_balance") * F.lit(POINT_VALUE_PHP), 2))
+        .withColumn("redemption_rate",
+                    F.round(F.col("lifetime_points_redeemed")
+                            / F.nullif(F.col("lifetime_points_earned"), F.lit(0)), 3))
+        # qualified_tier = what the member's rolling-12mo earnings justify.
+        .withColumn("qualified_tier", _tier_col(F.col("points_earned_12mo")))
+        .withColumn("qualified_tier_rank", _tier_col(F.col("points_earned_12mo"), want_rank=True))
+        # current_tier = the tier the member currently HOLDS. Mostly tracks the
+        # qualified tier, with realistic drift: ~12% hold one tier above (grace /
+        # tier inflation → downgrade risk), ~10% one below (recent upgrade not yet
+        # reflected → upgrade eligible). Deterministic via a hash of customer_id.
+        .withColumn("_drift", F.pmod(F.hash(F.col("customer_id")), F.lit(100)))
+        .withColumn("current_tier_rank",
+                    F.when(F.col("_drift") < 12, F.least(F.col("qualified_tier_rank") + 1, F.lit(4)))
+                    .when(F.col("_drift") < 22, F.greatest(F.col("qualified_tier_rank") - 1, F.lit(1)))
+                    .otherwise(F.col("qualified_tier_rank")))
+        .withColumn("current_tier", _rank_name(F.col("current_tier_rank")))
+        .withColumn("tier_status",
+                    F.when(F.col("qualified_tier_rank") > F.col("current_tier_rank"), "Upgrade eligible")
+                    .when(F.col("qualified_tier_rank") < F.col("current_tier_rank"), "Downgrade risk")
+                    .otherwise("On track"))
+        # Points still needed this year to reach the next status tier.
+        .withColumn("points_to_next_tier",
+                    F.when(F.col("qualified_tier_rank") >= 4, F.lit(0))
+                    .when(F.col("qualified_tier_rank") == 3, F.lit(40000) - F.col("points_earned_12mo"))
+                    .when(F.col("qualified_tier_rank") == 2, F.lit(15000) - F.col("points_earned_12mo"))
+                    .otherwise(F.lit(5000) - F.col("points_earned_12mo")))
+        .withColumn("days_since_last_redeem", F.datediff(F.current_date(), F.col("last_redeem_date")))
         .withColumn("_refreshed_at", F.current_timestamp())
+        .drop("_drift", "loyalty_tier")
     )
     return df
 
@@ -252,5 +346,92 @@ def category_mix():
             F.sum("line_amount").alias("revenue"),
             F.sum("quantity").alias("units"),
             F.countDistinct("order_id").alias("orders"),
+        )
+    )
+
+
+# ---------------------------------------------------------------------------
+# GOLD: points_economy  (daily earn / redeem / expire + running liability)
+# ---------------------------------------------------------------------------
+@dp.materialized_view(
+    name=gold("points_economy"),
+    comment="Daily points earned/redeemed/expired/bonus, net flow, and running outstanding balance.",
+    table_properties={"quality": "gold"},
+    cluster_by=["txn_date"],
+)
+def points_economy():
+    daily = (
+        spark.read.table("points_ledger_clean")
+        .groupBy("txn_date").agg(
+            F.sum(F.when(F.col("txn_type") == "EARN", F.col("points")).otherwise(0)).alias("points_earned"),
+            F.sum(F.when(F.col("txn_type") == "BONUS", F.col("points")).otherwise(0)).alias("bonus_points"),
+            F.sum(F.when(F.col("txn_type") == "REDEEM", -F.col("points")).otherwise(0)).alias("points_redeemed"),
+            F.sum(F.when(F.col("txn_type") == "EXPIRE", -F.col("points")).otherwise(0)).alias("points_expired"),
+            F.sum("points").alias("net_points"),
+            F.sum(F.when(F.col("txn_type") == "REDEEM", 1).otherwise(0)).alias("redemptions"),
+            F.countDistinct("customer_id").alias("active_members"),
+        )
+        .filter(F.col("txn_date").isNotNull())
+    )
+    # Running outstanding balance = cumulative net points issued (the liability).
+    running = W.orderBy("txn_date").rowsBetween(W.unboundedPreceding, W.currentRow)
+    return (
+        daily
+        .withColumn("outstanding_balance", F.sum("net_points").over(running))
+        .withColumn("outstanding_liability_php",
+                    F.round(F.col("outstanding_balance") * F.lit(POINT_VALUE_PHP), 2))
+        .withColumn("redemption_ratio",
+                    F.round(F.col("points_redeemed") / F.nullif(F.col("points_earned"), F.lit(0)), 3))
+    )
+
+
+# ---------------------------------------------------------------------------
+# GOLD: reward_performance  (per catalog reward)
+# ---------------------------------------------------------------------------
+@dp.materialized_view(
+    name=gold("reward_performance"),
+    comment="Per-reward redemptions, points spent, unique members, and peso value delivered.",
+    table_properties={"quality": "gold"},
+)
+def reward_performance():
+    rewards = spark.read.table(bronze("dim_reward"))
+    redeems = (
+        spark.read.table("points_ledger_clean")
+        .filter(F.col("txn_type") == "REDEEM")
+        .groupBy("reward_id").agg(
+            F.count("*").alias("redemptions"),
+            F.sum(-F.col("points")).alias("points_spent"),
+            F.countDistinct("customer_id").alias("unique_members"),
+            F.max("txn_date").alias("last_redeemed_date"),
+        )
+    )
+    return (
+        rewards.join(redeems, "reward_id", "left")
+        .withColumn("redemptions", F.coalesce("redemptions", F.lit(0)))
+        .withColumn("points_spent", F.coalesce("points_spent", F.lit(0)))
+        .withColumn("unique_members", F.coalesce("unique_members", F.lit(0)))
+        .withColumn("value_delivered_php", F.round(F.col("redemptions") * F.col("est_value_php"), 2))
+        .withColumn("pct_of_redemptions",
+                    F.round(F.col("redemptions")
+                            / F.nullif(F.sum("redemptions").over(W.partitionBy()), F.lit(0)), 4))
+    )
+
+
+# ---------------------------------------------------------------------------
+# GOLD: tier_migration  (held-tier × qualified-tier transition matrix)
+# ---------------------------------------------------------------------------
+@dp.materialized_view(
+    name=gold("tier_migration"),
+    comment="Members by held status tier × the tier their rolling-12mo points qualify for.",
+    table_properties={"quality": "gold"},
+)
+def tier_migration():
+    return (
+        spark.read.table(gold("customer_360"))
+        .groupBy("current_tier", "current_tier_rank", "qualified_tier", "qualified_tier_rank", "tier_status")
+        .agg(
+            F.count("*").alias("members"),
+            F.sum("points_balance").alias("points_balance"),
+            F.round(F.sum("points_liability_php"), 2).alias("points_liability_php"),
         )
     )

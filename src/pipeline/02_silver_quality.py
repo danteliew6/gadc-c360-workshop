@@ -128,6 +128,58 @@ def app_events_clean():
 
 
 # ---------------------------------------------------------------------------
+# POINTS LEDGER  — the MyMcDonald's Rewards points economy. Critical rules drop
+# (and quarantine) malformed rows; a soft rule warns on the sign convention.
+# ---------------------------------------------------------------------------
+LEDGER_RULES_CRITICAL = {
+    "valid_ledger_id": "ledger_id IS NOT NULL",
+    "valid_customer": "customer_id IS NOT NULL",
+    "known_txn_type": "txn_type IN ('EARN','REDEEM','EXPIRE','BONUS','ADJUST')",
+    "points_present": "points IS NOT NULL",
+}
+LEDGER_RULES_WARN = {
+    # Earn/bonus add points; redeem/expire remove them — flag sign violations.
+    "earn_is_positive": "txn_type NOT IN ('EARN','BONUS') OR points > 0",
+    "redeem_is_negative": "txn_type NOT IN ('REDEEM','EXPIRE') OR points < 0",
+    "redeem_has_reward": "txn_type <> 'REDEEM' OR reward_id IS NOT NULL",
+}
+
+
+@dp.materialized_view(
+    comment="Cleaned points ledger (earn/redeem/expire/bonus). Critical rules drop; sign rules warn.",
+    table_properties={"quality": "silver", "delta.enableChangeDataFeed": "true"},
+    cluster_by=["txn_date", "txn_type"],
+)
+@dp.expect_all(LEDGER_RULES_WARN)
+@dp.expect_all_or_drop(LEDGER_RULES_CRITICAL)
+def points_ledger_clean():
+    return (
+        spark.read.table(bronze("points_ledger_raw"))
+        .dropDuplicates(["ledger_id"])
+        .withColumn("txn_ts", F.to_timestamp("txn_ts"))
+        .withColumn("txn_date", F.to_date("txn_ts"))
+        .withColumn("points", F.col("points").cast("int"))
+        .drop("_rescued_data", "_ingest_batch")
+    )
+
+
+@dp.materialized_view(
+    comment="Quarantine: ledger rows that failed a CRITICAL rule, kept for audit.",
+    table_properties={"quality": "quarantine"},
+)
+def points_ledger_quarantine():
+    fail_expr = " OR ".join(f"NOT ({c})" for c in LEDGER_RULES_CRITICAL.values())
+    return (
+        spark.read.table(bronze("points_ledger_raw"))
+        .withColumn("_failed_rules", F.expr(
+            "concat_ws(',', " + ",".join(
+                f"CASE WHEN NOT ({c}) THEN '{name}' END" for name, c in LEDGER_RULES_CRITICAL.items()
+            ) + ")"))
+        .filter(F.expr(fail_expr))
+    )
+
+
+# ---------------------------------------------------------------------------
 # CUSTOMER dimension — SCD Type 2 via Auto CDC.
 # A cleaned streaming view feeds an SCD2 target so loyalty-tier / profile
 # changes are tracked with __START_AT / __END_AT history.

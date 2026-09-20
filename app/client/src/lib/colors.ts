@@ -26,5 +26,20 @@ export const CHURN_TONE: Record<string, keyof typeof COLORS> = {
   HIGH: 'bad',
 };
 
-/** Loyalty tier ordering for stable display. */
-export const TIER_ORDER = ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND'];
+/** MyMcDonald's Rewards status tiers, low → high. */
+export const TIER_ORDER = ['Member', 'Silver', 'Gold', 'Platinum'];
+
+/** Status-tier → chip tone (Platinum/Gold lean gold; Member neutral). */
+export const TIER_TONE: Record<string, keyof typeof COLORS> = {
+  Member: 'muted',
+  Silver: 'info',
+  Gold: 'gold',
+  Platinum: 'brand',
+};
+
+/** Tier-status (held vs qualified) → semantic tone. */
+export const TIER_STATUS_TONE: Record<string, keyof typeof COLORS> = {
+  'On track': 'good',
+  'Upgrade eligible': 'gold',
+  'Downgrade risk': 'bad',
+};

@@ -15,7 +15,10 @@ export interface MemberSearchRow {
   mobile: string | null;
   region: string | null;
   city: string | null;
-  loyalty_tier: string | null;
+  current_tier: string | null;
+  qualified_tier: string | null;
+  tier_status: string | null;
+  points_balance: number;
   rfm_segment: string | null;
   churn_risk: string | null;
   total_orders: number;
@@ -28,6 +31,7 @@ export interface MemberSearchRow {
 export interface Facets {
   regions: string[];
   segments: string[];
+  tiers: string[];
 }
 
 export interface Member {
@@ -45,9 +49,27 @@ export interface Member {
   city: string | null;
   signup_date: string | null;
   signup_channel: string | null;
-  loyalty_tier: string | null;
   preferred_language: string | null;
   marketing_consent: boolean | null;
+  // MyMcDonald's Rewards — points economy & status tiers.
+  current_tier: string | null;
+  current_tier_rank: number | null;
+  qualified_tier: string | null;
+  qualified_tier_rank: number | null;
+  tier_status: string | null;
+  points_balance: number;
+  points_liability_php: number;
+  lifetime_points_earned: number;
+  lifetime_points_redeemed: number;
+  points_expired: number;
+  bonus_points: number;
+  points_earned_12mo: number;
+  redemptions_count: number;
+  redemption_rate: number;
+  points_to_next_tier: number;
+  days_since_last_redeem: number | null;
+  last_redeem_date: string | null;
+  last_earn_date: string | null;
   total_orders: number;
   total_spend: number;
   avg_order_value: number;
@@ -78,7 +100,7 @@ export interface Member {
 }
 
 export interface ActionEntry {
-  kind: 'voucher' | 'ticket' | 'tier_change' | 'note';
+  kind: 'voucher' | 'ticket' | 'tier_change' | 'note' | 'points_adjustment' | 'reward_grant';
   created_at: string;
   summary: string;
 }
@@ -86,6 +108,33 @@ export interface ActionEntry {
 export interface MemberDetail {
   member: Member;
   actions: ActionEntry[];
+}
+
+export interface RewardPerf {
+  reward_id: string;
+  reward_name: string;
+  category: string | null;
+  point_cost: number;
+  est_value_php: number;
+  reward_tier: string | null;
+  value_per_point: number;
+  is_active: boolean | null;
+  redemptions: number;
+  points_spent: number;
+  unique_members: number;
+  last_redeemed_date: string | null;
+  value_delivered_php: number;
+  pct_of_redemptions: number;
+}
+
+export interface RewardsResponse {
+  kpis: {
+    rewards: number;
+    redemptions: number;
+    points_spent: number;
+    value_delivered_php: number;
+  } | null;
+  rows: RewardPerf[];
 }
 
 export interface StoreRow {

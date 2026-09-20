@@ -146,4 +146,27 @@ export async function initAppSchema(): Promise<void> {
        created_at timestamptz NOT NULL DEFAULT now()
      )`
   );
+  // MyMcDonald's Rewards write-back: goodwill / clawback points adjustments and
+  // reward grants (a reward redeemed on the member's behalf by an agent).
+  await query(
+    `CREATE TABLE IF NOT EXISTS ${appTable('points_adjustments')} (
+       id serial PRIMARY KEY,
+       customer_id text NOT NULL,
+       points integer NOT NULL,
+       reason text,
+       created_by text,
+       created_at timestamptz NOT NULL DEFAULT now()
+     )`
+  );
+  await query(
+    `CREATE TABLE IF NOT EXISTS ${appTable('reward_grants')} (
+       id serial PRIMARY KEY,
+       customer_id text NOT NULL,
+       reward_id text,
+       reward_name text,
+       point_cost integer,
+       created_by text,
+       created_at timestamptz NOT NULL DEFAULT now()
+     )`
+  );
 }
