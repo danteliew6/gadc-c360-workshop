@@ -76,7 +76,7 @@
         {
           "widget": {
             "name": "kpi_active",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "measure(Active Members)", "expression": "MEASURE(`Active Members`)"}], "disaggregated": false}}],
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_members", "fields": [{"name": "measure(Active Members)", "expression": "MEASURE(`Active Members`)"}], "disaggregated": false}}],
             "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Active Members", "showTitle": true}, "encodings": {"value": {"fieldName": "measure(Active Members)", "displayName": "Active Members", "format": {"type": "number-plain", "decimalPlaces": {"type": "exact", "places": 0}}}}}
           },
           "position": {"x": 0, "y": 2, "width": 3, "height": 3}
@@ -84,7 +84,7 @@
         {
           "widget": {
             "name": "kpi_points",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "measure(Outstanding Points)", "expression": "MEASURE(`Outstanding Points`)"}], "disaggregated": false}}],
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_members", "fields": [{"name": "measure(Outstanding Points)", "expression": "MEASURE(`Outstanding Points`)"}], "disaggregated": false}}],
             "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Outstanding Points", "showTitle": true}, "encodings": {"value": {"fieldName": "measure(Outstanding Points)", "displayName": "Points", "format": {"type": "number-plain", "decimalPlaces": {"type": "max", "places": 0}, "abbreviation": "compact"}}}}
           },
           "position": {"x": 3, "y": 2, "width": 3, "height": 3}
@@ -92,7 +92,7 @@
         {
           "widget": {
             "name": "kpi_liability",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "measure(Outstanding Liability)", "expression": "MEASURE(`Outstanding Liability`)"}], "disaggregated": false}}],
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_members", "fields": [{"name": "measure(Outstanding Liability)", "expression": "MEASURE(`Outstanding Liability`)"}], "disaggregated": false}}],
             "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Outstanding Liability (₱)", "showTitle": true}, "encodings": {"value": {"fieldName": "measure(Outstanding Liability)", "displayName": "Liability", "format": {"type": "number-currency", "currencyCode": "PHP", "decimalPlaces": {"type": "max", "places": 1}, "abbreviation": "compact"}}}}
           },
           "position": {"x": 6, "y": 2, "width": 3, "height": 3}
@@ -100,7 +100,7 @@
         {
           "widget": {
             "name": "kpi_redrate",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "measure(Redemption Rate)", "expression": "MEASURE(`Redemption Rate`)"}], "disaggregated": false}}],
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_members", "fields": [{"name": "measure(Redemption Rate)", "expression": "MEASURE(`Redemption Rate`)"}], "disaggregated": false}}],
             "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Redemption Rate", "showTitle": true}, "encodings": {"value": {"fieldName": "measure(Redemption Rate)", "displayName": "Redemption Rate", "format": {"type": "number-percent", "decimalPlaces": {"type": "max", "places": 1}}}}}
           },
           "position": {"x": 9, "y": 2, "width": 3, "height": 3}
@@ -108,7 +108,7 @@
         {
           "widget": {
             "name": "liability_trend",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_points", "fields": [{"name": "monthly(txn_date)", "expression": "DATE_TRUNC(\"MONTH\", `txn_date`)"}, {"name": "max(outstanding_liability_php)", "expression": "MAX(`outstanding_liability_php`)"}], "disaggregated": false}}],
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_points", "fields": [{"name": "monthly(txn_date)", "expression": "DATE_TRUNC(\"MONTH\", `txn_date`)"}, {"name": "max(outstanding_liability_php)", "expression": "MAX(`outstanding_liability_php`)"}], "disaggregated": false}}],
             "spec": {"version": 3, "widgetType": "line", "frame": {"title": "Outstanding points liability (₱, month-end)", "showTitle": true}, "encodings": {"x": {"fieldName": "monthly(txn_date)", "scale": {"type": "temporal"}, "displayName": "Month"}, "y": {"fieldName": "max(outstanding_liability_php)", "scale": {"type": "quantitative"}, "displayName": "Liability (₱)"}}}
           },
           "position": {"x": 0, "y": 5, "width": 8, "height": 5}
@@ -116,7 +116,7 @@
         {
           "widget": {
             "name": "tier_pie",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "measure(Members)", "expression": "MEASURE(`Members`)"}, {"name": "current_tier", "expression": "`current_tier`"}], "disaggregated": false}}],
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_members", "fields": [{"name": "measure(Members)", "expression": "MEASURE(`Members`)"}, {"name": "current_tier", "expression": "`current_tier`"}], "disaggregated": false}}],
             "spec": {"version": 3, "widgetType": "pie", "frame": {"title": "Members by status tier", "showTitle": true}, "encodings": {"angle": {"fieldName": "measure(Members)", "scale": {"type": "quantitative"}, "displayName": "Members"}, "color": {"fieldName": "current_tier", "scale": {"type": "categorical"}, "displayName": "Tier"}, "label": {"show": true}}}
           },
           "position": {"x": 8, "y": 5, "width": 4, "height": 5}
@@ -124,7 +124,7 @@
         {
           "widget": {
             "name": "tier_status_bar",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "tier_status", "expression": "`tier_status`"}, {"name": "measure(Members)", "expression": "MEASURE(`Members`)"}], "disaggregated": false}}],
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_members", "fields": [{"name": "tier_status", "expression": "`tier_status`"}, {"name": "measure(Members)", "expression": "MEASURE(`Members`)"}], "disaggregated": false}}],
             "spec": {"version": 3, "widgetType": "bar", "frame": {"title": "Members by tier status", "showTitle": true}, "encodings": {"x": {"fieldName": "tier_status", "scale": {"type": "categorical"}, "displayName": "Tier status"}, "y": {"fieldName": "measure(Members)", "scale": {"type": "quantitative"}, "displayName": "Members"}, "color": {"fieldName": "tier_status", "scale": {"type": "categorical", "mappings": [{"value": "Downgrade risk", "color": "#DA291C"}, {"value": "Upgrade eligible", "color": "#FFC72C"}, {"value": "On track", "color": "#3C7A3C"}]}}}}
           },
           "position": {"x": 0, "y": 10, "width": 6, "height": 5}
@@ -132,7 +132,7 @@
         {
           "widget": {
             "name": "region_liability_bar",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "region", "expression": "`region`"}, {"name": "measure(Outstanding Liability)", "expression": "MEASURE(`Outstanding Liability`)"}], "disaggregated": false, "orders": [{"direction": "DESC", "expression": "MEASURE(`Outstanding Liability`)"}]}}],
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_members", "fields": [{"name": "region", "expression": "`region`"}, {"name": "measure(Outstanding Liability)", "expression": "MEASURE(`Outstanding Liability`)"}], "disaggregated": false, "orders": [{"direction": "DESC", "expression": "MEASURE(`Outstanding Liability`)"}]}}],
             "spec": {"version": 3, "widgetType": "bar", "frame": {"title": "Points liability by region (₱)", "showTitle": true}, "encodings": {"x": {"fieldName": "region", "scale": {"type": "categorical"}, "displayName": "Region"}, "y": {"fieldName": "measure(Outstanding Liability)", "scale": {"type": "quantitative"}, "displayName": "Liability (₱)"}}}
           },
           "position": {"x": 6, "y": 10, "width": 6, "height": 5}
@@ -140,7 +140,7 @@
         {
           "widget": {
             "name": "top_members",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "full_name", "expression": "`full_name`"}, {"name": "region", "expression": "`region`"}, {"name": "current_tier", "expression": "`current_tier`"}, {"name": "qualified_tier", "expression": "`qualified_tier`"}, {"name": "tier_status", "expression": "`tier_status`"}, {"name": "points_balance", "expression": "`points_balance`"}, {"name": "lifetime_points_earned", "expression": "`lifetime_points_earned`"}, {"name": "redemptions_count", "expression": "`redemptions_count`"}, {"name": "total_spend", "expression": "`total_spend`"}], "disaggregated": true, "orders": [{"direction": "DESC", "expression": "`points_balance`"}]}}],
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_members", "fields": [{"name": "full_name", "expression": "`full_name`"}, {"name": "region", "expression": "`region`"}, {"name": "current_tier", "expression": "`current_tier`"}, {"name": "qualified_tier", "expression": "`qualified_tier`"}, {"name": "tier_status", "expression": "`tier_status`"}, {"name": "points_balance", "expression": "`points_balance`"}, {"name": "lifetime_points_earned", "expression": "`lifetime_points_earned`"}, {"name": "redemptions_count", "expression": "`redemptions_count`"}, {"name": "total_spend", "expression": "`total_spend`"}], "disaggregated": true, "orders": [{"direction": "DESC", "expression": "`points_balance`"}]}}],
             "spec": {"version": 2, "widgetType": "table", "frame": {"title": "Top members by points balance", "showTitle": true}, "encodings": {"columns": [{"fieldName": "full_name", "displayName": "Member"}, {"fieldName": "region", "displayName": "Region"}, {"fieldName": "current_tier", "displayName": "Tier"}, {"fieldName": "qualified_tier", "displayName": "Qualifies"}, {"fieldName": "tier_status", "displayName": "Status"}, {"fieldName": "points_balance", "displayName": "Points", "format": {"type": "number-plain", "decimalPlaces": {"type": "exact", "places": 0}}}, {"fieldName": "lifetime_points_earned", "displayName": "Earned", "format": {"type": "number-plain", "decimalPlaces": {"type": "exact", "places": 0}}}, {"fieldName": "redemptions_count", "displayName": "Redemptions"}, {"fieldName": "total_spend", "displayName": "Spend (₱)", "format": {"type": "number-currency", "currencyCode": "PHP", "decimalPlaces": {"type": "exact", "places": 0}}}]}}
           },
           "position": {"x": 0, "y": 15, "width": 12, "height": 6}
@@ -163,7 +163,7 @@
         {
           "widget": {
             "name": "kpi_redemptions",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_rewards", "fields": [{"name": "sum(redemptions)", "expression": "SUM(`redemptions`)"}], "disaggregated": false}}],
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_rewards", "fields": [{"name": "sum(redemptions)", "expression": "SUM(`redemptions`)"}], "disaggregated": false}}],
             "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Total Redemptions", "showTitle": true}, "encodings": {"value": {"fieldName": "sum(redemptions)", "displayName": "Redemptions", "format": {"type": "number-plain", "decimalPlaces": {"type": "exact", "places": 0}}}}}
           },
           "position": {"x": 0, "y": 2, "width": 3, "height": 3}
@@ -171,7 +171,7 @@
         {
           "widget": {
             "name": "kpi_points_spent",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_rewards", "fields": [{"name": "sum(points_spent)", "expression": "SUM(`points_spent`)"}], "disaggregated": false}}],
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_rewards", "fields": [{"name": "sum(points_spent)", "expression": "SUM(`points_spent`)"}], "disaggregated": false}}],
             "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Points Redeemed", "showTitle": true}, "encodings": {"value": {"fieldName": "sum(points_spent)", "displayName": "Points", "format": {"type": "number-plain", "decimalPlaces": {"type": "max", "places": 0}, "abbreviation": "compact"}}}}
           },
           "position": {"x": 3, "y": 2, "width": 3, "height": 3}
@@ -179,7 +179,7 @@
         {
           "widget": {
             "name": "kpi_value",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_rewards", "fields": [{"name": "sum(value_delivered_php)", "expression": "SUM(`value_delivered_php`)"}], "disaggregated": false}}],
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_rewards", "fields": [{"name": "sum(value_delivered_php)", "expression": "SUM(`value_delivered_php`)"}], "disaggregated": false}}],
             "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Value Delivered (₱)", "showTitle": true}, "encodings": {"value": {"fieldName": "sum(value_delivered_php)", "displayName": "Value", "format": {"type": "number-currency", "currencyCode": "PHP", "decimalPlaces": {"type": "max", "places": 1}, "abbreviation": "compact"}}}}
           },
           "position": {"x": 6, "y": 2, "width": 3, "height": 3}
@@ -187,7 +187,7 @@
         {
           "widget": {
             "name": "kpi_redeeming",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_members", "fields": [{"name": "measure(Members Redeeming)", "expression": "MEASURE(`Members Redeeming`)"}], "disaggregated": false}}],
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_members", "fields": [{"name": "measure(Members Redeeming)", "expression": "MEASURE(`Members Redeeming`)"}], "disaggregated": false}}],
             "spec": {"version": 2, "widgetType": "counter", "frame": {"title": "Members Redeeming", "showTitle": true}, "encodings": {"value": {"fieldName": "measure(Members Redeeming)", "displayName": "Members", "format": {"type": "number-plain", "decimalPlaces": {"type": "exact", "places": 0}}}}}
           },
           "position": {"x": 9, "y": 2, "width": 3, "height": 3}
@@ -195,7 +195,7 @@
         {
           "widget": {
             "name": "reward_redemptions_bar",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_rewards", "fields": [{"name": "reward_name", "expression": "`reward_name`"}, {"name": "sum(redemptions)", "expression": "SUM(`redemptions`)"}], "disaggregated": false, "orders": [{"direction": "DESC", "expression": "SUM(`redemptions`)"}]}}],
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_rewards", "fields": [{"name": "reward_name", "expression": "`reward_name`"}, {"name": "sum(redemptions)", "expression": "SUM(`redemptions`)"}], "disaggregated": false, "orders": [{"direction": "DESC", "expression": "SUM(`redemptions`)"}]}}],
             "spec": {"version": 3, "widgetType": "bar", "frame": {"title": "Redemptions by reward", "showTitle": true}, "encodings": {"x": {"fieldName": "sum(redemptions)", "scale": {"type": "quantitative"}, "displayName": "Redemptions"}, "y": {"fieldName": "reward_name", "scale": {"type": "categorical"}, "displayName": "Reward"}}}
           },
           "position": {"x": 0, "y": 5, "width": 6, "height": 6}
@@ -203,7 +203,7 @@
         {
           "widget": {
             "name": "value_by_tier_bar",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_rewards", "fields": [{"name": "reward_tier", "expression": "`reward_tier`"}, {"name": "sum(value_delivered_php)", "expression": "SUM(`value_delivered_php`)"}], "disaggregated": false, "orders": [{"direction": "DESC", "expression": "SUM(`value_delivered_php`)"}]}}],
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_rewards", "fields": [{"name": "reward_tier", "expression": "`reward_tier`"}, {"name": "sum(value_delivered_php)", "expression": "SUM(`value_delivered_php`)"}], "disaggregated": false, "orders": [{"direction": "DESC", "expression": "SUM(`value_delivered_php`)"}]}}],
             "spec": {"version": 3, "widgetType": "bar", "frame": {"title": "Value delivered by reward tier (₱)", "showTitle": true}, "encodings": {"x": {"fieldName": "reward_tier", "scale": {"type": "categorical"}, "displayName": "Reward tier"}, "y": {"fieldName": "sum(value_delivered_php)", "scale": {"type": "quantitative"}, "displayName": "Value (₱)"}}}
           },
           "position": {"x": 6, "y": 5, "width": 6, "height": 6}
@@ -211,7 +211,7 @@
         {
           "widget": {
             "name": "points_flow",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_points", "fields": [{"name": "monthly(txn_date)", "expression": "DATE_TRUNC(\"MONTH\", `txn_date`)"}, {"name": "sum(points_earned)", "expression": "SUM(`points_earned`)"}], "disaggregated": false}}],
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_points", "fields": [{"name": "monthly(txn_date)", "expression": "DATE_TRUNC(\"MONTH\", `txn_date`)"}, {"name": "sum(points_earned)", "expression": "SUM(`points_earned`)"}], "disaggregated": false}}],
             "spec": {"version": 3, "widgetType": "line", "frame": {"title": "Points earned per month", "showTitle": true}, "encodings": {"x": {"fieldName": "monthly(txn_date)", "scale": {"type": "temporal"}, "displayName": "Month"}, "y": {"fieldName": "sum(points_earned)", "scale": {"type": "quantitative"}, "displayName": "Points earned"}}}
           },
           "position": {"x": 0, "y": 11, "width": 6, "height": 5}
@@ -219,7 +219,7 @@
         {
           "widget": {
             "name": "tier_migration_bar",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_tiers", "fields": [{"name": "current_tier", "expression": "`current_tier`"}, {"name": "qualified_tier", "expression": "`qualified_tier`"}, {"name": "sum(members)", "expression": "SUM(`members`)"}], "disaggregated": false}}],
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_tiers", "fields": [{"name": "current_tier", "expression": "`current_tier`"}, {"name": "qualified_tier", "expression": "`qualified_tier`"}, {"name": "sum(members)", "expression": "SUM(`members`)"}], "disaggregated": false}}],
             "spec": {"version": 3, "widgetType": "bar", "frame": {"title": "Held tier vs. qualified tier (members)", "showTitle": true}, "encodings": {"x": {"fieldName": "current_tier", "scale": {"type": "categorical"}, "displayName": "Held tier"}, "y": {"fieldName": "sum(members)", "scale": {"type": "quantitative"}, "displayName": "Members"}, "color": {"fieldName": "qualified_tier", "scale": {"type": "categorical"}, "displayName": "Qualifies for"}}}
           },
           "position": {"x": 6, "y": 11, "width": 6, "height": 5}
@@ -227,7 +227,7 @@
         {
           "widget": {
             "name": "rewards_table",
-            "queries": [{"name": "q", "query": {"datasetName": "ds_rewards", "fields": [{"name": "reward_name", "expression": "`reward_name`"}, {"name": "reward_tier", "expression": "`reward_tier`"}, {"name": "category", "expression": "`category`"}, {"name": "point_cost", "expression": "`point_cost`"}, {"name": "redemptions", "expression": "`redemptions`"}, {"name": "unique_members", "expression": "`unique_members`"}, {"name": "points_spent", "expression": "`points_spent`"}, {"name": "value_delivered_php", "expression": "`value_delivered_php`"}], "disaggregated": true, "orders": [{"direction": "DESC", "expression": "`redemptions`"}]}}],
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_rewards", "fields": [{"name": "reward_name", "expression": "`reward_name`"}, {"name": "reward_tier", "expression": "`reward_tier`"}, {"name": "category", "expression": "`category`"}, {"name": "point_cost", "expression": "`point_cost`"}, {"name": "redemptions", "expression": "`redemptions`"}, {"name": "unique_members", "expression": "`unique_members`"}, {"name": "points_spent", "expression": "`points_spent`"}, {"name": "value_delivered_php", "expression": "`value_delivered_php`"}], "disaggregated": true, "orders": [{"direction": "DESC", "expression": "`redemptions`"}]}}],
             "spec": {"version": 2, "widgetType": "table", "frame": {"title": "Rewards catalog", "showTitle": true}, "encodings": {"columns": [{"fieldName": "reward_name", "displayName": "Reward"}, {"fieldName": "reward_tier", "displayName": "Tier"}, {"fieldName": "category", "displayName": "Category"}, {"fieldName": "point_cost", "displayName": "Point cost", "format": {"type": "number-plain", "decimalPlaces": {"type": "exact", "places": 0}}}, {"fieldName": "redemptions", "displayName": "Redemptions"}, {"fieldName": "unique_members", "displayName": "Members"}, {"fieldName": "points_spent", "displayName": "Points spent", "format": {"type": "number-plain", "decimalPlaces": {"type": "exact", "places": 0}}}, {"fieldName": "value_delivered_php", "displayName": "Value (₱)", "format": {"type": "number-currency", "currencyCode": "PHP", "decimalPlaces": {"type": "exact", "places": 0}}}]}}
           },
           "position": {"x": 0, "y": 16, "width": 12, "height": 6}
