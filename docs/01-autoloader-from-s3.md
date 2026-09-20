@@ -1,8 +1,13 @@
 # Module 1 · Auto Loader ingestion from S3
 
-**Goal:** incrementally ingest four raw JSON feeds (`customers`, `orders`,
-`order_items`, `app_events`) that land in an **S3 bucket** into Bronze Delta
-tables, with schema inference, schema evolution, and rescued-data capture.
+**Goal:** incrementally ingest five raw JSON feeds (`customers`, `orders`,
+`order_items`, `app_events`, `points_ledger`) that land in an **S3 bucket** into
+Bronze Delta tables, with schema inference, schema evolution, and rescued-data
+capture. `points_ledger` is the **MyMcDonald's Rewards** points feed — every
+earn / redeem / expire / bonus transaction — and is the source of truth for the
+loyalty points economy built in Module 2. Reference dimensions `dim_reward`
+(rewards catalog) and `dim_tier` (status tiers + earn multipliers) are written
+straight to Bronze as Delta by the generator.
 
 Code: [`src/pipeline/01_bronze_autoloader.py`](../src/pipeline/01_bronze_autoloader.py)
 Landing zone: [`src/setup/00_provision_uc.py`](../src/setup/00_provision_uc.py)
@@ -82,7 +87,7 @@ Key decisions:
 
 We also apply **Liquid Clustering** (`ALTER TABLE … CLUSTER BY (…)`) so Bronze
 reads stay fast as tables grow — `region` for customers, `order_ts`/`event_ts`
-for the time-series feeds.
+for the time-series feeds, and `txn_ts` for the points ledger.
 
 ## 4. Demonstrating incrementality
 

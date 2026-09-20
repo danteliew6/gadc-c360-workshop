@@ -1,9 +1,10 @@
 # Module 2 · Lakeflow SDP pipeline + data-quality expectations
 
 **Goal:** turn raw Bronze into governed, trustworthy Silver and a curated
-**Customer 360** Gold layer using a **Lakeflow Spark Declarative Pipeline (SDP)**
-— with data-quality **expectations**, an **SCD Type 2** customer dimension via
-**Auto CDC**, and a governed **metric view**.
+**Member 360 + MyMcDonald's Rewards points economy** Gold layer using a
+**Lakeflow Spark Declarative Pipeline (SDP)** — with data-quality
+**expectations**, an **SCD Type 2** customer dimension via **Auto CDC**, and a
+governed **metric view**.
 
 Code:
 [`02_silver_quality.py`](../src/pipeline/02_silver_quality.py) ·
@@ -32,11 +33,11 @@ are read with `spark.conf.get("workshop.*")`.
 
 | Dataset | Type | Rationale |
 |---------|------|-----------|
-| `orders_clean`, `order_items_clean`, `app_events_clean` | **Materialized View** | batch reads of Bronze; recomputed each run |
-| `orders_quarantine` | Materialized View | audit copy of rows that failed critical rules |
+| `orders_clean`, `order_items_clean`, `app_events_clean`, `points_ledger_clean` | **Materialized View** | batch reads of Bronze; recomputed each run |
+| `orders_quarantine`, `points_ledger_quarantine` | Materialized View | audit copies of rows that failed critical rules |
 | `customers_clean` | **Temporary View** (streaming) | private staging that feeds the SCD2 flow |
 | `dim_customer` | **Streaming Table** + **Auto CDC** | SCD Type 2 profile/tier history |
-| `customer_360`, `store_performance`, `daily_sales`, `category_mix` | Materialized View (Gold) | aggregates over the full dataset |
+| `customer_360`, `points_economy`, `reward_performance`, `tier_migration`, `store_performance`, `daily_sales`, `category_mix` | Materialized View (Gold) | aggregates over the full dataset |
 
 Rule of thumb from the pipeline decision tree: **streaming source → Streaming
 Table; aggregation over full dataset → Materialized View.** Gold is all MVs
@@ -83,6 +84,14 @@ drops on null id / future signup date:
                         "signup_not_in_future": "signup_date <= current_date()"})
 ```
 
+The **points ledger** gets the same treatment (`points_ledger_clean` +
+`points_ledger_quarantine`): critical rules **drop** malformed rows — non-null
+`ledger_id`/`customer_id`, a known `txn_type` in
+`('EARN','REDEEM','EXPIRE','BONUS','ADJUST')`, non-null `points`; while soft
+rules **warn** on the sign convention (earn/bonus add points, redeem/expire
+remove them) and that a `REDEEM` carries a `reward_id`. This keeps the points
+economy in Module 2's Gold marts trustworthy.
+
 ## 4. SCD Type 2 customer dimension (Auto CDC)
 
 `dim_customer` keeps **full history** of profile / loyalty-tier changes. A cleaned
@@ -101,32 +110,47 @@ Query current state with `WHERE __END_AT IS NULL`; history is the full table.
 (Lakeflow uses the double-underscore `__START_AT` / `__END_AT` columns.) Gold's
 `customer_360` reads only current rows.
 
-## 5. Gold — the Customer 360 mart
+## 5. Gold — the Member 360 mart + points economy
 
-`customer_360` is one row per member combining:
+`customer_360` is one row per member combining the profile, RFM/CLV/churn, and
+the full **MyMcDonald's Rewards points economy**:
 
-- **Profile** (current SCD2 row): tier, region, signup channel, language, consent.
+- **Profile** (current SCD2 row): region, signup channel, language, consent.
+- **Points economy** (from `points_ledger_clean`): `points_balance`,
+  `lifetime_points_earned`, `lifetime_points_redeemed`, `points_expired`,
+  `points_earned_12mo`, `redemptions_count`, `redemption_rate`, and an estimated
+  peso `points_liability_php` (balance × ₱0.04/pt).
+- **Status tiers**: `current_tier` (the tier the member *holds*) vs.
+  `qualified_tier` (what their rolling-12-month earned points justify), and
+  `tier_status` — **Upgrade eligible / On track / Downgrade risk** — plus
+  `points_to_next_tier`. (This replaces the old raw `loyalty_tier` column.)
 - **RFM**: `recency_days`, `total_orders` (frequency), `total_spend` (monetary),
-  scored into quintiles (`ntile(5)`) → `rfm_score` and a labeled `rfm_segment`
-  (Champion / Promising / At Risk / Hibernating / Prospect).
-- **CLV estimate**: annualized projection from realized spend over tenure.
-- **Churn risk**: rule-based on recency (High > 60d, Medium > 30d, Low ≤ 30d).
-- **Favorites**: `favorite_store`, `favorite_category`, `preferred_channel`
-  computed with per-customer `row_number()` argmax windows.
-- **Engagement**: active days, rewards redeemed, order count → `engagement_score`.
+  scored into quintiles (`ntile(5)`) → `rfm_score` and a labeled `rfm_segment`.
+- **CLV estimate**, **churn risk** (recency-based), and **favorites**
+  (`favorite_store`, `favorite_category`, `preferred_channel`).
 
-Supporting marts: `store_performance` (per-store revenue, AOV, drive-thru share),
-`daily_sales` (date × region × channel for trends), `category_mix` (menu category
-revenue, localized-item split). **Gold preserves the dimensions the dashboard
-filters on** — region, tier, channel, segment, date.
+Three marts model the rewards program itself:
+
+- **`points_economy`** — daily points earned / redeemed / expired / bonus, net
+  flow, and a running **outstanding balance** + peso liability (the growing
+  liability line on the dashboard).
+- **`reward_performance`** — per catalog reward: redemptions, points spent,
+  unique members, and peso value delivered.
+- **`tier_migration`** — the held-tier × qualified-tier transition matrix.
+
+Supporting marts stay: `store_performance`, `daily_sales`, `category_mix`.
+**Gold preserves the dimensions the dashboard filters on** — region, status
+tier, segment, date.
 
 ## 6. Governed metric view
 
 `04_metric_view.py` creates `gold.c360_metrics` — a UC **metric view** (YAML) that
-defines KPIs *once* (Active Members, Repeat Rate, AOV, High-Churn-Risk Members,
-Est. CLV) with dimensions (Region, Tier, RFM Segment, Channel). BI, Genie, and
-ad-hoc SQL all get the **same** definitions. This is what keeps "repeat rate" from
-meaning three different things in three different reports.
+defines the rewards KPIs *once*: Members, Active Members, **Points Earned /
+Redeemed / Balance**, **Outstanding Liability PHP**, **Redemption Rate**,
+**Members Redeeming**, **Upgrade Eligible / Downgrade Risk Members**, Est. CLV —
+with dimensions Region, **Status Tier**, **Qualified Tier**, **Tier Status**, RFM
+Segment. BI, Genie, and ad-hoc SQL all get the **same** definitions, so
+"redemption rate" never means three different things in three reports.
 
 ## 7. Run it
 
@@ -138,7 +162,8 @@ databricks bundle run   mcdo_ph_c360_workshop -t dev -p fevm-dante-classic-stabl
 Watch the pipeline's lineage graph and **Data quality** tab in the UI. Then:
 
 ```sql
-SELECT rfm_segment, churn_risk, count(*) members, round(sum(total_spend),0) revenue
+SELECT current_tier, tier_status, count(*) members,
+       round(sum(points_balance),0) points, round(sum(points_liability_php),0) liability_php
 FROM   dante_classic_stable_catalog.mcdo_ph_gold.customer_360
 GROUP BY 1,2 ORDER BY 1,2;
 ```
